@@ -17,7 +17,9 @@ Volatile tests howto:
      TARGET=ia32 make
     )
 
-  To do volatile tests using volatile scripts, you only need to:
+  To do volatile tests using volatile scripts, you only need to 
+  modify some scripts in csmith/utah/scripts/old_john_driver
+
   * open evaluate_program.pl: 
   change 
     my $CHECK_VOLATILE = $NO_VOLCHECK;
