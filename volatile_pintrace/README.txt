@@ -9,6 +9,9 @@ Volatile tests howto:
   * download pintool from:
     wget http://software.intel.com/sites/landingpage/pintool/downloads/pin-2.12-55942-gcc.4.4.7-linux.tar.gz
 
+  * cp pin.sh to $PIN_HOME/
+    (note: the new pin.sh only work on 64-bit system)
+
   * cp pinatrace.cpp to $PIN_HOME/source/tools/ManualExamples/
   * cd $PIN_HOME/source/tools/ManualExamples
   * make
