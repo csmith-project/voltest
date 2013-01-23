@@ -56,7 +56,8 @@ Some details about pinatrace:
 
     -output_mode summary  [default]
     In the summary mode, only the number of a volatile access will be 
-    dumped. Volatile accesses are measured byte-wise. For example:
+    dumped. Volatile accesses are measured byte-wise, and reads/writes
+    are aggregate counts over the entire run of a test case. For example:
 
     volatile int g;
 
