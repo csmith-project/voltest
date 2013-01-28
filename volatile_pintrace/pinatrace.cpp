@@ -46,6 +46,53 @@ END_LEGAL */
 #define WRITE_MODE 1
 #define READ_MODE 2
 
+/* checksum computation from CSmith */
+static uint32_t crc32_tab[256];
+static uint32_t crc32_context = 0xFFFFFFFFUL;
+
+static void Crc32Gentab (void)
+{
+    uint32_t crc;
+    const uint32_t poly = 0xEDB88320UL;
+    int i, j;
+
+    for (i = 0; i < 256; i++) {
+        crc = i;
+        for (j = 8; j > 0; j--) {
+            if (crc & 1) {
+                crc = (crc >> 1) ^ poly;
+            } else {
+                crc >>= 1;
+            }
+        }
+        crc32_tab[i] = crc;
+    }
+}
+
+static void Crc32Byte (uint8_t b)
+{
+    crc32_context =
+        ((crc32_context >> 8) & 0x00FFFFFF) ^
+        crc32_tab[(crc32_context ^ b) & 0xFF];
+}
+
+static void Crc32(uint64_t val)
+{
+    Crc32Byte ((val>>0) & 0xff);
+    Crc32Byte ((val>>8) & 0xff);
+    Crc32Byte ((val>>16) & 0xff);
+    Crc32Byte ((val>>24) & 0xff);
+    Crc32Byte ((val>>32) & 0xff);
+    Crc32Byte ((val>>40) & 0xff);
+    Crc32Byte ((val>>48) & 0xff);
+    Crc32Byte ((val>>56) & 0xff);
+}
+
+static void DumpChecksum()
+{
+    cout << "vol_access_checksum = " << (crc32_context ^ 0xFFFFFFFFUL) << "\n";
+}
+
 class VolElem {
 public:
     VolElem(const string &name, ADDRINT addr, size_t sz_);
@@ -75,6 +122,8 @@ public:
     void inc_write_counts(ADDRINT addr, size_t sz);
 
     void add_byte_values(ADDRINT addr, size_t sz, unsigned int mode);
+
+    void compute_checksum();
 
     void dump_summary();
 
@@ -205,6 +254,14 @@ VolElem::add_byte_values(ADDRINT addr, size_t sz, unsigned int mode)
     }
 }
 
+void VolElem::compute_checksum()
+{
+    for(size_t i = 0; i < sz_; i++) {
+        Crc32(byte_read_counts_[i]);
+        Crc32(byte_write_counts_[i]);
+    }
+}
+
 void
 VolElem::dump_summary()
 {
@@ -233,24 +290,25 @@ VolElem::dump_verbose()
 
 FILE * trace;
 
-static VolElem *vol_head = NULL;
+static VolElem *vol_head;
 
 static BOOL logging = FALSE;
 
 enum OUTPUT_MODE {
+    M_CHECKSUM,
     M_SUMMARY,
     M_VERBOSE,
 };
 
-static enum OUTPUT_MODE output_mode = M_SUMMARY;
+static enum OUTPUT_MODE output_mode = M_CHECKSUM;
 
 KNOB<string> KnobInputFile(KNOB_MODE_WRITEONCE, "pintool",
     "vol-input", "", "specify input file which contains volatile addresses");
 
 KNOB<string> KnobOutputMode(KNOB_MODE_WRITEONCE, "pintool",
-    "output-mode", "summary", "specify the dump mode [summary|verbose]");
+    "output-mode", "checksum", "specify the dump mode [checksum|summary|verbose]");
 
-void split_string(const string &str, vector<string> &v, const char sep_char)
+static void split_string(const string &str, vector<string> &v, const char sep_char)
 {
     size_t pos = 0;
     size_t start_pos = 0;
@@ -279,7 +337,7 @@ static unsigned long StrToLong(const char *s, int base)
     return val;
 }
 
-BOOL empty_line(const std::string &line)
+static BOOL empty_line(const std::string &line)
 {
         if (line.empty())
                 return true;
@@ -336,17 +394,30 @@ static int InitVolTable(const string &fname)
 static void DumpVolTable()
 {
     VolElem *elem = vol_head;
+
+    if (output_mode == M_CHECKSUM) {
+        Crc32Gentab();
+    }
+
     while(elem) {
-        if (output_mode == M_SUMMARY) {
+        switch (output_mode) {
+        case M_CHECKSUM:
+            elem->compute_checksum();
+            break;
+        case M_SUMMARY:
             elem->dump_summary();
-        }
-        else if (output_mode == M_VERBOSE) {
+            break;
+        case M_VERBOSE:
             elem->dump_verbose();
-        }
-        else {
-            assert("can't happen!" && 0);
+            break;
+        default:
+            assert("Unknown output_mode!" && 0);
         }
         elem = elem->get_next();
+    }
+
+    if (output_mode == M_CHECKSUM) {
+        DumpChecksum();
     }
 }
 
@@ -515,7 +586,10 @@ VOID Fini(INT32 code, VOID *v)
 
 static int SetOutputMode(const string &mode)
 {
-    if (!mode.compare("summary")) {
+    if (!mode.compare("checksum")) {
+        output_mode = M_CHECKSUM;
+    }
+    else if (!mode.compare("summary")) {
         output_mode = M_SUMMARY;
     }
     else if (!mode.compare("verbose")) {
