@@ -52,7 +52,7 @@ static uint32_t crc32_tab[256];
 static uint32_t crc32_context = 0xFFFFFFFFUL;
 static uint64_t seed;
 
-static uint64_t gen_seed(void)
+static uint64_t GenSeed(void)
 {
   int64_t l;
   asm volatile(   "rdtsc\n\t"
@@ -61,13 +61,7 @@ static uint64_t gen_seed(void)
   return l;
 }
 
-static void init_rand(FILE *ostream)
-{
-  fprintf(ostream, "# seed=%lu\n", seed);
-  srand48(seed);
-}
-
-static uint64_t gen_rand(void)
+static uint64_t GenRand(void)
 {
   return lrand48();
 }
@@ -112,7 +106,7 @@ static void Crc32(uint64_t val)
 
 static void DumpChecksum()
 {
-    cout << "vol_access_checksum = " << (crc32_context ^ 0xFFFFFFFFUL) << "\n";
+    cout << "vol_access_checksum = " << uppercase << hex << (crc32_context ^ 0xFFFFFFFFUL) << "\n";
 }
 
 class VolElem {
@@ -215,12 +209,10 @@ VolElem::inc_counts(vector<unsigned int> &counts, ADDRINT addr, size_t sz)
     //if (!is_in_range(addr, sz))
     //    return;
 
-    if (addr >= addr_) {
+    if (addr >= addr_)
         start_pos = (addr - addr_);
-    }
-    else {
+    else 
         start_pos = 0;
-    }
 
     for (size_t i = 0; i < sz; i++) {
         if ((i+start_pos) >= sz_)
@@ -343,7 +335,7 @@ KNOB<BOOL> KnobRandomRead(KNOB_MODE_WRITEONCE, "pintool",
 KNOB<uint64_t> KnobSeed(KNOB_MODE_WRITEONCE, "pintool",
     "seed", "0", "seed");
 
-static void split_string(const string &str, vector<string> &v, const char sep_char)
+static void SplitString(const string &str, vector<string> &v, const char sep_char)
 {
     size_t pos = 0;
     size_t start_pos = 0;
@@ -351,9 +343,8 @@ static void split_string(const string &str, vector<string> &v, const char sep_ch
         start_pos = pos;
         pos = str.find_first_of(sep_char, pos);
         std::string s = str.substr(start_pos, (pos - start_pos));
-        if (!s.empty()) {
+        if (!s.empty())
             v.push_back(s);
-        }
         if (pos == string::npos)
             break;
         pos++;
@@ -372,10 +363,10 @@ static unsigned long StrToLong(const char *s, int base)
     return val;
 }
 
-static BOOL empty_line(const std::string &line)
+static BOOL EmptyLine(const std::string &line)
 {
         if (line.empty())
-                return true;
+            return true;
         size_t found = line.find_first_not_of("\t\n ");
         return (found == string::npos);
 }
@@ -383,7 +374,7 @@ static BOOL empty_line(const std::string &line)
 static VolElem *ParseLine(const string &line)
 {
     vector<string> tuple;
-    split_string(line, tuple, ';');
+    SplitString(line, tuple, ';');
     assert(tuple.size() == 4);
     
     ADDRINT addr = StrToLong(tuple[1].c_str(), 16);
@@ -413,9 +404,8 @@ static void AddVolElem(VolElem *elem)
 
 static int InitVolTable(const string &fname)
 {
-    if (fname.empty()) {
+    if (fname.empty())
         return -1;
-    }
 
     ifstream vols(fname.c_str());
     if (!vols.is_open()) {
@@ -427,7 +417,7 @@ static int InitVolTable(const string &fname)
     while(!vols.eof()) {
         VolElem *elem = NULL;
         getline(vols, line);
-        if (empty_line(line)) {
+        if (EmptyLine(line)) {
             continue;
         }
         elem = ParseLine(line);
@@ -442,9 +432,8 @@ static void DumpVolTable()
 {
     VolElem *elem = vol_head;
 
-    if (output_mode == M_CHECKSUM) {
+    if (output_mode == M_CHECKSUM)
         Crc32Gentab();
-    }
 
     while(elem) {
         switch (output_mode) {
@@ -463,9 +452,8 @@ static void DumpVolTable()
         elem = elem->get_next();
     }
 
-    if (output_mode == M_CHECKSUM) {
+    if (output_mode == M_CHECKSUM)
         DumpChecksum();
-    }
 }
 
 static void FiniVolTable()
@@ -500,6 +488,7 @@ static void RecordMem(ADDRINT addr, ADDRINT sz, unsigned int mode)
 
     VolElem *elem = vol_head;
     BOOL good_mem_addr = false;
+    BOOL has_pointer_value = false;
     
     while (elem != NULL) {
         if ((elem = IsVolAddress(addr, sz, elem)) != NULL) {
@@ -519,13 +508,16 @@ static void RecordMem(ADDRINT addr, ADDRINT sz, unsigned int mode)
             if (output_mode == M_VERBOSE) {
                 elem->add_byte_values(addr, sz, mode);
             }
+
+            good_mem_addr = true;
             if (elem->is_pointer()) {
-                good_mem_addr = false;
+                has_pointer_value = true;
             }
             elem = elem->get_next();
         }
     }
-    if (good_mem_addr) {
+    if (enable_random_reads && good_mem_addr && !has_pointer_value) {
+        uint64_t value = GenRand();
         PIN_SafeCopy((void*)addr, &value, sz);
     }
 }
@@ -677,12 +669,16 @@ int main(int argc, char *argv[])
     PIN_InitSymbols();
     if (PIN_Init(argc, argv)) return Usage();
 
-    if (SetOutputMode(KnobOutputMode.Value())) {
+    if (SetOutputMode(KnobOutputMode.Value()))
         return Usage();
-    }
+
     enable_random_reads = KnobRandomRead.Value();
     if (enable_random_reads) {
-        seed = gen_seed();
+        seed = KnobSeed.Value();
+        if (!seed)
+            seed = GenSeed();
+        fprintf(stdout, "seed=%lu\n", seed);
+        srand48(seed);
     }
 
     IMG_AddInstrumentFunction(Image, 0);
