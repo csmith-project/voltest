@@ -41,6 +41,7 @@ END_LEGAL */
 #include <fstream>
 #include <cstdlib>
 #include <cassert>
+#include <algorithm>
 #include "pin.H"
 
 #define WRITE_MODE 1
@@ -49,6 +50,27 @@ END_LEGAL */
 /* checksum computation from CSmith */
 static uint32_t crc32_tab[256];
 static uint32_t crc32_context = 0xFFFFFFFFUL;
+static uint64_t seed;
+
+static uint64_t gen_seed(void)
+{
+  int64_t l;
+  asm volatile(   "rdtsc\n\t"
+                : "=A" (l)
+        );
+  return l;
+}
+
+static void init_rand(FILE *ostream)
+{
+  fprintf(ostream, "# seed=%lu\n", seed);
+  srand48(seed);
+}
+
+static uint64_t gen_rand(void)
+{
+  return lrand48();
+}
 
 static void Crc32Gentab (void)
 {
@@ -95,7 +117,7 @@ static void DumpChecksum()
 
 class VolElem {
 public:
-    VolElem(const string &name, ADDRINT addr, size_t sz_);
+    VolElem(const string &name, ADDRINT addr, size_t sz_, BOOL is_pointer);
         
     ~VolElem(void);
 
@@ -104,6 +126,8 @@ public:
     size_t get_size() { return sz_; }
 
     VolElem *get_next() { return next_; }
+
+    BOOL is_pointer() { return is_pointer_; }
 
     BOOL in_range(ADDRINT addr, size_t sz) {
         return ((addr == addr_) ||
@@ -133,13 +157,15 @@ private:
 
     void inc_counts(vector<unsigned int> &counts, ADDRINT addr, size_t sz);
 
-    bool is_in_range(ADDRINT addr, size_t sz);
+    BOOL is_in_range(ADDRINT addr, size_t sz);
 
     const string name_;
 
     const ADDRINT addr_;
 
     const size_t sz_;
+
+    BOOL is_pointer_;
 
     VolElem *next_;
 
@@ -157,10 +183,11 @@ private:
     VolElem &operator=(const VolElem &v);
 };
 
-VolElem::VolElem(const string &name, ADDRINT addr, size_t sz)
+VolElem::VolElem(const string &name, ADDRINT addr, size_t sz, BOOL is_pointer)
     : name_(name),
       addr_(addr),
       sz_(sz),
+      is_pointer_(is_pointer),
       next_(NULL),
       byte_write_counts_(sz, 0),
       byte_read_counts_(sz, 0)
@@ -173,7 +200,7 @@ VolElem::~VolElem()
 
 }
 
-bool
+BOOL
 VolElem::is_in_range(ADDRINT addr, size_t sz)
 {
     return ((addr == addr_) ||
@@ -294,6 +321,8 @@ static VolElem *vol_head;
 
 static BOOL logging = FALSE;
 
+static BOOL enable_random_reads = FALSE;
+
 enum OUTPUT_MODE {
     M_CHECKSUM,
     M_SUMMARY,
@@ -307,6 +336,12 @@ KNOB<string> KnobInputFile(KNOB_MODE_WRITEONCE, "pintool",
 
 KNOB<string> KnobOutputMode(KNOB_MODE_WRITEONCE, "pintool",
     "output-mode", "checksum", "specify the dump mode [checksum|summary|verbose]");
+
+KNOB<BOOL> KnobRandomRead(KNOB_MODE_WRITEONCE, "pintool",
+    "random-read", "0", "feed a random values to a volatile read");
+
+KNOB<uint64_t> KnobSeed(KNOB_MODE_WRITEONCE, "pintool",
+    "seed", "0", "seed");
 
 static void split_string(const string &str, vector<string> &v, const char sep_char)
 {
@@ -349,12 +384,24 @@ static VolElem *ParseLine(const string &line)
 {
     vector<string> tuple;
     split_string(line, tuple, ';');
-    assert(tuple.size() == 3);
+    assert(tuple.size() == 4);
     
     ADDRINT addr = StrToLong(tuple[1].c_str(), 16);
     size_t size = StrToLong(tuple[2].c_str(), 10);
   
-    VolElem *elem = new VolElem(tuple[0], addr, size);
+    BOOL is_pointer;
+    std::string type = tuple[3];
+    type.erase(std::remove(type.begin(), type.end(), ' '), type.end());
+    if (type == "pointer") {
+        is_pointer = true;
+    }
+    else if (type == "non-pointer") {
+        is_pointer= false;
+    }
+    else {
+        assert(0 && "bad type!");
+    }
+    VolElem *elem = new VolElem(tuple[0], addr, size, is_pointer);
     return elem;
 }
 
@@ -452,6 +499,7 @@ static void RecordMem(ADDRINT addr, ADDRINT sz, unsigned int mode)
         return;
 
     VolElem *elem = vol_head;
+    BOOL good_mem_addr = false;
     
     while (elem != NULL) {
         if ((elem = IsVolAddress(addr, sz, elem)) != NULL) {
@@ -471,8 +519,14 @@ static void RecordMem(ADDRINT addr, ADDRINT sz, unsigned int mode)
             if (output_mode == M_VERBOSE) {
                 elem->add_byte_values(addr, sz, mode);
             }
+            if (elem->is_pointer()) {
+                good_mem_addr = false;
+            }
             elem = elem->get_next();
         }
+    }
+    if (good_mem_addr) {
+        PIN_SafeCopy((void*)addr, &value, sz);
     }
 }
 
@@ -508,6 +562,7 @@ VOID Instruction(INS ins, VOID *v)
                 IARG_MEMORYOP_EA, memOp,
                 IARG_MEMORYREAD_SIZE,
                 IARG_END);
+
         }
         // Note that in some architectures a single memory operand can be 
         // both read and written (for instance incl (%eax) on IA-32)
@@ -624,6 +679,10 @@ int main(int argc, char *argv[])
 
     if (SetOutputMode(KnobOutputMode.Value())) {
         return Usage();
+    }
+    enable_random_reads = KnobRandomRead.Value();
+    if (enable_random_reads) {
+        seed = gen_seed();
     }
 
     IMG_AddInstrumentFunction(Image, 0);
