@@ -7,6 +7,7 @@
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Parse/ParseAST.h"
+#include "llvm/Config/config.h"
 #include "Checker.h"
 
 using namespace clang;
@@ -97,7 +98,8 @@ bool CheckerManager::initializeCompilerInstance(std::string &ErrorMsg)
   PP.getBuiltinInfo().InitializeBuiltins(PP.getIdentifierTable(),
                                          PP.getLangOpts());
 
-  if (!ClangInstance->InitializeSourceManager(SrcFileName)) {
+  if (!ClangInstance->InitializeSourceManager(
+        FrontendInputFile(SrcFileName, IK))) {
     ErrorMsg = "Cannot open source file!";
     return false;
   }

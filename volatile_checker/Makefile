@@ -21,7 +21,7 @@ CXXFLAGS = -O0 -Wall -fno-strict-aliasing -g
 LLVM_CXXFLAGS = `${llvm_dir}/bin/llvm-config --cxxflags`
 LLVM_LDFLAGS = `${llvm_dir}/bin/llvm-config --ldflags`
 #LLVM_LIBS = `${llvm_dir}/bin/llvm-config --libs | tr " " "\n" | grep -v 'gtest\|LLVMIntelJITEvents\|LLVMOProfileJIT'`
-LLVM_LIBS = `${llvm_dir}/bin/llvm-config --libs core mc`
+LLVM_LIBS = `${llvm_dir}/bin/llvm-config --libs`
 
 INCLUDES = ${LLVM_CXXFLAGS} -I${llvm_dir}/include/clang/ -I.
 LDFLAGS = ${LLVM_LDFLAGS}
