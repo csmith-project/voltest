@@ -23,8 +23,9 @@ CheckerManager *CheckerManager::GetInstance()
     return CheckerManager::Instance;
 
   CheckerManager::Instance = new CheckerManager();
-  assert(CheckerManager::Instance);
-
+  CheckerAssert(CheckerManager::Instance && "NULL Instance");
+  CheckerAssert(CheckerManager::CheckersMapPtr && "NULL CheckersMapPtr");
+  
   CheckerManager::Instance->CheckersMap = 
     *CheckerManager::CheckersMapPtr;
   return CheckerManager::Instance;
