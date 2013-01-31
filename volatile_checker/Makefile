@@ -23,33 +23,40 @@ LLVM_LDFLAGS = `${llvm_dir}/bin/llvm-config --ldflags`
 #LLVM_LIBS = `${llvm_dir}/bin/llvm-config --libs | tr " " "\n" | grep -v 'gtest\|LLVMIntelJITEvents\|LLVMOProfileJIT'`
 LLVM_LIBS = `${llvm_dir}/bin/llvm-config --libs`
 
-INCLUDES = ${LLVM_CXXFLAGS} -I${llvm_dir}/include/clang/ -I.
+INCLUDES = ${LLVM_CXXFLAGS} -I${llvm_dir}/include/clang
 LDFLAGS = ${LLVM_LDFLAGS}
 LIBS = -lclangFrontendTool -lclangFrontend -lclangDriver -lclangSerialization \
        -lclangCodeGen -lclangParse -lclangSema -lclangAnalysis \
        -lclangEdit -lclangAST -lclangLex -lclangBasic \
        ${LLVM_LIBS} -ldl
 
-CHECKER_SOURCES = VolatileChecker.cpp \
-                  CheckerManager.cpp \
-                  Checker.cpp
+CHECKER_HEADERS = AccessOnceChecker.h
 
-CHECKER_OBJS = VolatileChecker.o \
-               CheckerManager.o \
-               Checker.o
+CHECKER_SOURCES = AccessOnceChecker.cpp
+
+CHECKER_OBJS = AccessOnceChecker.o
  
+OBJS = VolatileChecker.o \
+       CheckerManager.o \
+       Checker.o \
+       ${CHECKER_OBJS}
+
+CHECKER_DEPS = Checker.cpp Checker.h 
+
 .SUFFIXES : .o .cpp
 .cpp.o :
 	${CXX} -g ${ENABLE_CHECKER_ASSERT} ${INCLUDES} ${CXXFLAGS} -c $<
 
-volatile_checker: ${CHECKER_OBJS} 
-	${CXX} -o volatile_checker ${CHECKER_OBJS} ${LDFLAGS} ${LIBS}
+volatile_checker: ${OBJS} 
+	${CXX} -o volatile_checker ${OBJS} ${LDFLAGS} ${LIBS}
 
 VolatileChecker.o: VolatileChecker.cpp
 
-CheckerManager.o: CheckerManager.cpp
+CheckerManager.o: CheckerManager.cpp CheckerManager.h ${CHECKER_HEADERS} ${CHECKER_SOURCES}
 
-Checker.o: Checker.cpp
+Checker.o: Checker.cpp Checker.h
+
+AccessOnceChecker.o: AccessOnceChecker.cpp AccessOnceChecker.h ${CHECKER_DEPS}
 
 clean:
 	rm -rf *.o
