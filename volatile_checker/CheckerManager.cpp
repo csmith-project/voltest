@@ -156,69 +156,6 @@ bool CheckerManager::initializeCompilerInstance(
   return true;
 }
 
-#if 0
-bool CheckerManager::initializeCompilerInstance(std::string &ErrorMsg)
-{
-  if (ClangInstance) {
-    ErrorMsg = "CompilerInstance has been initialized!";
-    return false;
-  }
-
-  ClangInstance = new CompilerInstance();
-  assert(ClangInstance);
-  
-  ClangInstance->createDiagnostics(0, NULL);
-
-
-  CompilerInvocation &Invocation = ClangInstance->getInvocation();
-  InputKind IK = FrontendOptions::getInputKindForExtension(
-        StringRef(SrcFileName).rsplit('.').second);
-  if ((IK == IK_C) || (IK == IK_PreprocessedC)) {
-    Invocation.setLangDefaults(ClangInstance->getLangOpts(), IK_C);
-  }
-  else if ((IK == IK_CXX) || (IK == IK_PreprocessedCXX)) {
-    // ISSUE: it might cause some problems when building AST
-    // for a function which has a non-declared callee, e.g., 
-    // It results an empty AST for the caller. 
-    Invocation.setLangDefaults(ClangInstance->getLangOpts(), IK_CXX);
-  }
-  else {
-    ErrorMsg = "Unsupported file type!";
-    return false;
-  }
-
-  TargetOptions &TargetOpts = ClangInstance->getTargetOpts();
-  TargetOpts.Triple = LLVM_DEFAULT_TARGET_TRIPLE;
-  TargetInfo *Target = 
-    TargetInfo::CreateTargetInfo(ClangInstance->getDiagnostics(),
-                                 TargetOpts);
-  ClangInstance->setTarget(Target);
-
-  ClangInstance->createFileManager();
-  ClangInstance->createSourceManager(ClangInstance->getFileManager());
-  ClangInstance->createPreprocessor();
-
-  DiagnosticConsumer &DgClient = ClangInstance->getDiagnosticClient();
-  DgClient.BeginSourceFile(ClangInstance->getLangOpts(),
-                           &ClangInstance->getPreprocessor());
-  ClangInstance->createASTContext();
-
-  assert(CurrentCheckerImpl && "Bad checker instance!");
-  ClangInstance->setASTConsumer(CurrentCheckerImpl);
-  Preprocessor &PP = ClangInstance->getPreprocessor();
-  PP.getBuiltinInfo().InitializeBuiltins(PP.getIdentifierTable(),
-                                         PP.getLangOpts());
-
-  if (!ClangInstance->InitializeSourceManager(
-        FrontendInputFile(SrcFileName, IK))) {
-    ErrorMsg = "Cannot open source file!";
-    return false;
-  }
-
-  return true;
-}
-#endif
-
 void CheckerManager::Finalize()
 {
   CheckerAssert(CheckerManager::Instance);
