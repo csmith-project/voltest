@@ -2,6 +2,7 @@
 
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/Lex/Lexer.h"
 
 #include "CheckerManager.h"
 
@@ -24,9 +25,31 @@ public:
     : ConsumerInstance(Instance)
   { }
 
+  bool VisitDeclRefExpr(DeclRefExpr *DRE);
+
 private:
   AccessOnceChecker *ConsumerInstance;
 };
+
+bool AccessOnceVisitor::VisitDeclRefExpr(DeclRefExpr *DRE)
+{
+  const VarDecl *VD = dyn_cast<VarDecl>(DRE->getDecl());
+  if (!VD)
+    return true;
+
+  SourceLocation Loc = DRE->getLocation();
+  if (!Loc.isMacroID())
+    return true;
+
+  StringRef M = 
+    Lexer::getImmediateMacroName(Loc, 
+                                 ConsumerInstance->Context->getSourceManager(),
+                                 ConsumerInstance->Context->getLangOpts());
+
+  if (M == ConsumerInstance->TheAccessOnceName)
+    llvm::outs() << "got one: " << VD->getNameAsString() << "\n";
+  return true;
+}
 
 void AccessOnceChecker::Initialize(ASTContext &context) 
 {

@@ -7,9 +7,17 @@
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Parse/ParseAST.h"
+#include "clang/Serialization/ASTReader.h"
+#include "clang/Frontend/TextDiagnosticPrinter.h"
+#include "clang/Driver/Compilation.h"
+#include "clang/Driver/Driver.h"
+#include "clang/Driver/Tool.h"
+
 #include "llvm/Config/config.h"
+
 #include "Checker.h"
 
+using namespace clang::driver;
 using namespace clang;
 
 CheckerManager* CheckerManager::Instance;
@@ -35,7 +43,7 @@ bool CheckerManager::isCXXLangOpt()
 {
   CheckerAssert(CheckerManager::Instance && "Invalid Instance!");
   CheckerAssert(CheckerManager::Instance->ClangInstance && 
-              "Invalid ClangInstance!");
+                "Invalid ClangInstance!");
   return (CheckerManager::Instance->ClangInstance->getLangOpts()
           .CPlusPlus);
 }
@@ -44,11 +52,91 @@ bool CheckerManager::isCLangOpt()
 {
   CheckerAssert(CheckerManager::Instance && "Invalid Instance!");
   CheckerAssert(CheckerManager::Instance->ClangInstance && 
-              "Invalid ClangInstance!");
+                "Invalid ClangInstance!");
   return (CheckerManager::Instance->ClangInstance->getLangOpts()
           .C99);
 }
 
+bool CheckerManager::initializeCompilerInstance(
+       llvm::SmallVector<const char *, 5> &Args,
+       const std::string &Path,
+       std::string &ErrorMsg)
+{
+  IntrusiveRefCntPtr<DiagnosticOptions> DiagOpts = new DiagnosticOptions();
+  TextDiagnosticPrinter *DiagClient =
+    new TextDiagnosticPrinter(llvm::errs(), &*DiagOpts);
+
+  IntrusiveRefCntPtr<DiagnosticIDs> DiagID(new DiagnosticIDs());
+  DiagnosticsEngine Diags(DiagID, &*DiagOpts, DiagClient);
+  Driver TheDriver(Path, llvm::sys::getDefaultTargetTriple(),
+                   "a.out", /*IsProduction=*/false, Diags);
+  TheDriver.setTitle(Args[0]);
+
+  OwningPtr<Compilation> Comp(TheDriver.BuildCompilation(Args));
+  CheckerAssert(Comp && "NULL Compilation instance!");
+
+  const driver::JobList &Jobs = Comp->getJobs();
+  CheckerAssert((Jobs.size() == 1) && isa<driver::Command>(*Jobs.begin()) &&
+                "Bad JobList!");
+
+  const driver::Command *Cmd = cast<driver::Command>(*Jobs.begin());
+  CheckerAssert((llvm::StringRef(Cmd->getCreator().getName()) == "clang") &&
+                "Invalid Cmd!");
+
+  const driver::ArgStringList &CCArgs = Cmd->getArguments();
+  OwningPtr<CompilerInvocation> CI(new CompilerInvocation);
+  CompilerInvocation::CreateFromArgs(*CI,
+                                     const_cast<const char **>(CCArgs.data()),
+                                     const_cast<const char **>(CCArgs.data()) +
+                                       CCArgs.size(),
+                                     Diags);
+
+  ClangInstance = new CompilerInstance();
+  ClangInstance->setInvocation(CI.take());
+
+  // Create the compilers actual diagnostics engine.
+  ClangInstance->createDiagnostics(int(CCArgs.size()),
+                                   const_cast<char**>(CCArgs.data()));
+  if (!ClangInstance->hasDiagnostics())
+    return false;
+
+  TargetOptions &TargetOpts = ClangInstance->getTargetOpts();
+  TargetOpts.Triple = LLVM_DEFAULT_TARGET_TRIPLE;
+  TargetInfo *Target = 
+    TargetInfo::CreateTargetInfo(ClangInstance->getDiagnostics(),
+                                 TargetOpts);
+  ClangInstance->setTarget(Target);
+  ClangInstance->createFileManager();
+  ClangInstance->createSourceManager(ClangInstance->getFileManager());
+  ClangInstance->createPreprocessor();
+
+  DiagnosticConsumer &DgClient = ClangInstance->getDiagnosticClient();
+  DgClient.BeginSourceFile(ClangInstance->getLangOpts(),
+                           &ClangInstance->getPreprocessor());
+  ClangInstance->createASTContext();
+
+  assert(CurrentCheckerImpl && "Bad checker instance!");
+  ClangInstance->setASTConsumer(CurrentCheckerImpl);
+  Preprocessor &PP = ClangInstance->getPreprocessor();
+  PP.getBuiltinInfo().InitializeBuiltins(PP.getIdentifierTable(),
+                                         PP.getLangOpts());
+
+  InputKind IK = FrontendOptions::getInputKindForExtension(
+        StringRef(SrcFileName).rsplit('.').second);
+  if (!((IK == IK_C) || (IK == IK_PreprocessedC) || 
+       (IK == IK_CXX) || (IK == IK_PreprocessedCXX))) {
+    ErrorMsg = "Unsupported file type!";
+    return false;
+  }
+  if (!ClangInstance->InitializeSourceManager(
+        FrontendInputFile(SrcFileName, IK))) {
+    ErrorMsg = "Cannot open source file!";
+    return false;
+  }
+  return true;
+}
+
+#if 0
 bool CheckerManager::initializeCompilerInstance(std::string &ErrorMsg)
 {
   if (ClangInstance) {
@@ -60,6 +148,22 @@ bool CheckerManager::initializeCompilerInstance(std::string &ErrorMsg)
   assert(ClangInstance);
   
   ClangInstance->createDiagnostics(0, NULL);
+
+  HeaderSearchOptions &HeaderOpts = ClangInstance->getHeaderSearchOpts();
+  // hard-coded header info - this is probably bad...
+  HeaderOpts.AddPath("/usr/local/include", frontend::System, /*IsUserSupplied=*/false,
+                     /*IsFramework=*/false, /*IgnoreSysRoot=*/true, 
+                     /*IsInternal=*/true, /*ImplicitExternC=*/false);
+  HeaderOpts.AddPath("/usr/include/x86_64-linux-gnu", 
+                     frontend::System, /*IsUserSupplied=*/false,
+                     /*IsFramework=*/false, /*IgnoreSysRoot=*/true, 
+                     /*IsInternal=*/true, /*ImplicitExternC=*/true);
+  HeaderOpts.AddPath("/include", frontend::System, /*IsUserSupplied=*/false,
+                     /*IsFramework=*/false, /*IgnoreSysRoot=*/true, 
+                     /*IsInternal=*/true, /*ImplicitExternC=*/true);
+  HeaderOpts.AddPath("/usr/include", frontend::System, /*IsUserSupplied=*/false,
+                     /*IsFramework=*/false, /*IgnoreSysRoot=*/true, 
+                     /*IsInternal=*/true, /*ImplicitExternC=*/true);
 
   CompilerInvocation &Invocation = ClangInstance->getInvocation();
   InputKind IK = FrontendOptions::getInputKindForExtension(
@@ -84,6 +188,7 @@ bool CheckerManager::initializeCompilerInstance(std::string &ErrorMsg)
     TargetInfo::CreateTargetInfo(ClangInstance->getDiagnostics(),
                                  TargetOpts);
   ClangInstance->setTarget(Target);
+
   ClangInstance->createFileManager();
   ClangInstance->createSourceManager(ClangInstance->getFileManager());
   ClangInstance->createPreprocessor();
@@ -107,10 +212,11 @@ bool CheckerManager::initializeCompilerInstance(std::string &ErrorMsg)
 
   return true;
 }
+#endif
 
 void CheckerManager::Finalize()
 {
-  assert(CheckerManager::Instance);
+  CheckerAssert(CheckerManager::Instance);
   
   std::map<std::string, Checker *>::iterator I, E;
   for (I = Instance->CheckersMap.begin(), 
@@ -133,6 +239,14 @@ int CheckerManager::doChecking()
 {
   ClangInstance->createSema(TU_Complete, 0);
   ClangInstance->getDiagnostics().setSuppressAllDiagnostics(true);
+#if 0
+  ClangInstance->getDiagnostics().setSuppressAllDiagnostics(false);
+  if (ClangInstance->getDiagnostics().hasErrorOccurred() ||
+      ClangInstance->getDiagnostics().hasFatalErrorOccurred()) {
+    CheckerAssert(0 && "Fatal error during checing!");
+  }
+#endif
+
   ParseAST(ClangInstance->getSema());
   ClangInstance->getDiagnosticClient().EndSourceFile();
 

@@ -3,9 +3,12 @@
 #include <cstdlib>
 
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/Path.h"
 #include "CheckerManager.h"
 
 static CheckerManager *CheckerMgr;
+
+std::string SrcFileName;
 
 static void PrintHelpMessage()
 {
@@ -105,7 +108,15 @@ static void HandleOneArg(const char *Arg)
   }
   else {
     CheckerMgr->setSrcFileName(ArgStr);
+    SrcFileName = ArgStr;
   }
+}
+
+llvm::sys::Path GetExecutablePath(const char *Argv0) {
+  // This just needs to be some symbol in the binary; C++ doesn't
+  // allow taking the address of ::main however.
+  void *MainAddr = (void*) (intptr_t) GetExecutablePath;
+  return llvm::sys::Path::GetMainExecutable(Argv0, MainAddr);
 }
 
 int main(int argc, char **argv)
@@ -119,7 +130,12 @@ int main(int argc, char **argv)
   if (!CheckerMgr->verify(ErrorMsg))
     Die(ErrorMsg);
 
-  if (!CheckerMgr->initializeCompilerInstance(ErrorMsg))
+  llvm::SmallVector<const char *, 5> Args;
+  Args.push_back(argv[0]);
+  Args.push_back(SrcFileName.c_str());
+  Args.push_back("-fsyntax-only");
+  llvm::sys::Path Path = GetExecutablePath(argv[0]);
+  if (!CheckerMgr->initializeCompilerInstance(Args, Path.str(), ErrorMsg))
     Die(ErrorMsg);
 
   int RV = CheckerMgr->doChecking();

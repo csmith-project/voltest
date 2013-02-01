@@ -6,10 +6,12 @@
 #include <cassert>
 
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/ADT/SmallVector.h"
 
 class Checker;
 namespace clang {
   class CompilerInstance;
+  class LangOptions;
 }
 
 class CheckerManager {
@@ -43,7 +45,9 @@ public:
     SrcFileName = FileName;
   }
 
-  bool initializeCompilerInstance(std::string &ErrorMsg);
+  bool initializeCompilerInstance(llvm::SmallVector<const char *, 5> &Args,
+                                  const std::string &Path, 
+                                  std::string &ErrorMsg);
 
   void printCheckers();
 

@@ -1,6 +1,7 @@
 #ifndef ACCESS_ONCE_CHECKER_H
 #define ACCESS_ONCE_CHECKER_H
 
+#include "llvm/ADT/StringRef.h"
 #include "Checker.h"
 
 namespace clang {
@@ -16,7 +17,8 @@ public:
 
   AccessOnceChecker(const char *CheckerName, const char *Desc)
     : Checker(CheckerName, Desc),
-      Visitor(NULL)
+      Visitor(NULL),
+      TheAccessOnceName("ACCESS_ONCE")
   { }
 
   ~AccessOnceChecker();
@@ -28,6 +30,8 @@ private:
   virtual void HandleTranslationUnit(clang::ASTContext &Ctx);
 
   AccessOnceVisitor *Visitor;
+
+  llvm::StringRef TheAccessOnceName;
 
   // Unimplemented
   AccessOnceChecker();
