@@ -62,6 +62,8 @@ bool CheckerManager::initializeCompilerInstance(
        const std::string &Path,
        std::string &ErrorMsg)
 {
+  // some code to construct CompilerInvocation instance was 
+  // copied from clang/examples/clang-interpreter/main.cpp
   IntrusiveRefCntPtr<DiagnosticOptions> DiagOpts = new DiagnosticOptions();
   TextDiagnosticPrinter *DiagClient =
     new TextDiagnosticPrinter(llvm::errs(), &*DiagOpts);
@@ -97,8 +99,26 @@ bool CheckerManager::initializeCompilerInstance(
   // Create the compilers actual diagnostics engine.
   ClangInstance->createDiagnostics(int(CCArgs.size()),
                                    const_cast<char**>(CCArgs.data()));
-  if (!ClangInstance->hasDiagnostics())
-    return false;
+  CheckerAssert(ClangInstance->hasDiagnostics() && 
+                "failed to create Diagnostics!");
+#if 0
+  // Just backup some code to hard-code search paths to system headers.
+  // TheDriver handles all of these.
+  HeaderSearchOptions &HeaderOpts = ClangInstance->getHeaderSearchOpts();
+  HeaderOpts.AddPath("/usr/local/include", frontend::System, /*IsUserSupplied=*/false,
+                     /*IsFramework=*/false, /*IgnoreSysRoot=*/true, 
+                     /*IsInternal=*/true, /*ImplicitExternC=*/false);
+  HeaderOpts.AddPath("/usr/include/x86_64-linux-gnu", 
+                     frontend::System, /*IsUserSupplied=*/false,
+                     /*IsFramework=*/false, /*IgnoreSysRoot=*/true, 
+                     /*IsInternal=*/true, /*ImplicitExternC=*/true);
+  HeaderOpts.AddPath("/include", frontend::System, /*IsUserSupplied=*/false,
+                     /*IsFramework=*/false, /*IgnoreSysRoot=*/true, 
+                     /*IsInternal=*/true, /*ImplicitExternC=*/true);
+  HeaderOpts.AddPath("/usr/include", frontend::System, /*IsUserSupplied=*/false,
+                     /*IsFramework=*/false, /*IgnoreSysRoot=*/true, 
+                     /*IsInternal=*/true, /*ImplicitExternC=*/true);
+#endif
 
   TargetOptions &TargetOpts = ClangInstance->getTargetOpts();
   TargetOpts.Triple = LLVM_DEFAULT_TARGET_TRIPLE;
@@ -149,21 +169,6 @@ bool CheckerManager::initializeCompilerInstance(std::string &ErrorMsg)
   
   ClangInstance->createDiagnostics(0, NULL);
 
-  HeaderSearchOptions &HeaderOpts = ClangInstance->getHeaderSearchOpts();
-  // hard-coded header info - this is probably bad...
-  HeaderOpts.AddPath("/usr/local/include", frontend::System, /*IsUserSupplied=*/false,
-                     /*IsFramework=*/false, /*IgnoreSysRoot=*/true, 
-                     /*IsInternal=*/true, /*ImplicitExternC=*/false);
-  HeaderOpts.AddPath("/usr/include/x86_64-linux-gnu", 
-                     frontend::System, /*IsUserSupplied=*/false,
-                     /*IsFramework=*/false, /*IgnoreSysRoot=*/true, 
-                     /*IsInternal=*/true, /*ImplicitExternC=*/true);
-  HeaderOpts.AddPath("/include", frontend::System, /*IsUserSupplied=*/false,
-                     /*IsFramework=*/false, /*IgnoreSysRoot=*/true, 
-                     /*IsInternal=*/true, /*ImplicitExternC=*/true);
-  HeaderOpts.AddPath("/usr/include", frontend::System, /*IsUserSupplied=*/false,
-                     /*IsFramework=*/false, /*IgnoreSysRoot=*/true, 
-                     /*IsInternal=*/true, /*ImplicitExternC=*/true);
 
   CompilerInvocation &Invocation = ClangInstance->getInvocation();
   InputKind IK = FrontendOptions::getInputKindForExtension(

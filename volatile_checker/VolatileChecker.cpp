@@ -113,8 +113,6 @@ static void HandleOneArg(const char *Arg)
 }
 
 llvm::sys::Path GetExecutablePath(const char *Argv0) {
-  // This just needs to be some symbol in the binary; C++ doesn't
-  // allow taking the address of ::main however.
   void *MainAddr = (void*) (intptr_t) GetExecutablePath;
   return llvm::sys::Path::GetMainExecutable(Argv0, MainAddr);
 }
