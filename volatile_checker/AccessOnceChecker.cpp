@@ -39,12 +39,12 @@ bool AccessOnceVisitor::VisitDeclRefExpr(DeclRefExpr *DRE)
 void AccessOnceChecker::Initialize(ASTContext &context) 
 {
   Checker::Initialize(context);
-  Visitor = new AccessOnceVisitor(this);
 }
 
 void AccessOnceChecker::HandleTranslationUnit(ASTContext &Ctx)
 {
-  Visitor->TraverseDecl(Ctx.getTranslationUnitDecl());
+  AccessOnceVisitor Visitor(this);
+  Visitor.TraverseDecl(Ctx.getTranslationUnitDecl());
 
   Ctx.getDiagnostics().setSuppressAllDiagnostics(false);
 
@@ -119,7 +119,6 @@ bool AccessOnceChecker::handleValueCmdOpt(const std::string &ArgStr,
 
 AccessOnceChecker::~AccessOnceChecker()
 {
-  if (Visitor)
-    delete Visitor;
+
 }
 

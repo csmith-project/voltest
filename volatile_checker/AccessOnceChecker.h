@@ -19,7 +19,6 @@ public:
 
   AccessOnceChecker(const char *CheckerName, const char *Desc)
     : Checker(CheckerName, Desc),
-      Visitor(NULL),
       TheAccessOnceName("ACCESS_ONCE")
   { }
 
@@ -41,8 +40,6 @@ private:
   bool checkVarAccess(clang::DeclRefExpr *DRE);
 
   StringSet VarNames;
-
-  AccessOnceVisitor *Visitor;
 
   llvm::StringRef TheAccessOnceName;
 
