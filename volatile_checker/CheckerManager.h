@@ -29,7 +29,7 @@ public:
 
   static bool isCLangOpt();
 
-  int doChecking();
+  int doChecking(std::string &ErrorMsg);
 
   bool verify(std::string &ErrorMsg);
 
@@ -44,6 +44,14 @@ public:
     assert(SrcFileName.empty() && "Could only process one file each time");
     SrcFileName = FileName;
   }
+
+  std::string getSrcFileName() {
+    return SrcFileName;
+  }
+
+  bool handleCheckerCmdOpt(const std::string &Arg);
+
+  void printCheckerOptions();
 
   bool initializeCompilerInstance(llvm::SmallVector<const char *, 5> &Args,
                                   const std::string &Path, 

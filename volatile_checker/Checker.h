@@ -2,6 +2,7 @@
 #define CHECKER_H
 
 #include <string>
+#include <set>
 #include "clang/AST/ASTConsumer.h"
 
 #ifndef ENABLE_CHECKER_ASSERT
@@ -21,6 +22,7 @@ public:
   Checker(const char *CheckerName, const char *Desc)
     : Name(CheckerName),
       Success(true),
+      CheckMsg(""),
       Context(NULL),
       DescriptionString(Desc)
   {
@@ -29,7 +31,8 @@ public:
 
   virtual ~Checker();
 
-  bool transSuccess() {
+  bool isSuccess(std::string &ErrorMsg) {
+    ErrorMsg = CheckMsg;
     return Success;
   }
 
@@ -37,13 +40,33 @@ public:
     return DescriptionString;
   }
 
+  virtual void printCmdOpts() { }
+
+  bool handleCmdOpt(const std::string &Arg);
+
 protected:
+
+  typedef std::set<std::string> StringSet;
+
+  virtual bool handleValueCmdOpt(const std::string &/*ArgStr*/,
+                                 size_t /*SepPos*/) {
+    return false;
+  }
+
+  virtual bool handleNonValueCmdOpt(const std::string &/*Arg*/) {
+    return false;
+  }
+
+  void splitString(const std::string &Str, char Delim, 
+                   StringSet &Elems);
 
   virtual void Initialize(clang::ASTContext &context);
 
   const std::string Name;
 
   bool Success;
+
+  std::string CheckMsg;
 
   clang::ASTContext *Context;
 

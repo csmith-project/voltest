@@ -8,8 +8,6 @@
 
 static CheckerManager *CheckerMgr;
 
-std::string SrcFileName;
-
 static void PrintHelpMessage()
 {
   llvm::outs() << "\n";
@@ -28,14 +26,16 @@ static void PrintHelpMessage()
 
   llvm::outs() << "  --verbose-checkers: ";
   llvm::outs() << "print verbose description messages for all checkers\n";
+  llvm::outs() << "\n";
 
+  CheckerMgr->printCheckerOptions();
   llvm::outs() << "\n";
 }
 
 static void DieOnBadCmdArg(const std::string &ArgStr)
 {
-  llvm::outs() << "Error: Bad command line option `" << ArgStr << "`\n";
-  llvm::outs() << "\n";
+  llvm::errs() << "Error: Bad command line option `" << ArgStr << "`\n";
+  llvm::errs() << "\n";
   PrintHelpMessage();
   CheckerManager::Finalize();
   exit(-1);
@@ -43,12 +43,12 @@ static void DieOnBadCmdArg(const std::string &ArgStr)
 
 static void Die(const std::string &Message)
 {
-  llvm::outs() << "Error: " << Message << "\n";
+  llvm::errs() << "Error: " << Message << "\n";
   CheckerManager::Finalize();
   exit(-1);
 }
 
-static void HandleOneArgValue(const std::string &ArgValueStr, size_t SepPos)
+static bool HandleOneArgValue(const std::string &ArgValueStr, size_t SepPos)
 {
   if ((SepPos < 1) || (SepPos >= ArgValueStr.length())) {
       DieOnBadCmdArg("--" + ArgValueStr);
@@ -60,16 +60,16 @@ static void HandleOneArgValue(const std::string &ArgValueStr, size_t SepPos)
   ArgValue = ArgValueStr.substr(SepPos+1);
 
   if (!ArgName.compare("checker")) {
-    if (CheckerMgr->setChecker(ArgValue)) {
+    if (CheckerMgr->setChecker(ArgValue))
       Die("Invalid checker[" + ArgValue + "]");
-    }
+    return true;
   }
   else {
-    DieOnBadCmdArg("--" + ArgValueStr);
+    return false;
   }
 }
 
-static void HandleOneNoneValueArg(const std::string &ArgStr)
+static bool HandleOneNonValueArg(const std::string &ArgStr)
 {
   if (!ArgStr.compare("help")) {
     PrintHelpMessage();
@@ -84,11 +84,11 @@ static void HandleOneNoneValueArg(const std::string &ArgStr)
     exit(0);
   }
   else {
-    DieOnBadCmdArg(ArgStr);
+    return false;
   }
 }
 
-static void HandleOneArg(const char *Arg)
+static bool HandleOneArg(const char *Arg)
 {
   std::string ArgStr(Arg);
 
@@ -99,16 +99,14 @@ static void HandleOneArg(const char *Arg)
 
     size_t found;
     found = SubArgStr.find('=');
-    if (found != std::string::npos) {
-      HandleOneArgValue(SubArgStr, found);
-    }
-    else {
-      HandleOneNoneValueArg(SubArgStr);
-    }
+    if (found != std::string::npos)
+      return HandleOneArgValue(SubArgStr, found);
+    else
+      return HandleOneNonValueArg(SubArgStr);
   }
   else {
     CheckerMgr->setSrcFileName(ArgStr);
-    SrcFileName = ArgStr;
+    return true;
   }
 }
 
@@ -120,8 +118,17 @@ llvm::sys::Path GetExecutablePath(const char *Argv0) {
 int main(int argc, char **argv)
 {
   CheckerMgr = CheckerManager::GetInstance();
+  llvm::SmallVector<std::string, 5> UnresolvedArgs;
+
   for (int i = 1; i < argc; i++) {
-    HandleOneArg(argv[i]);
+    if (!HandleOneArg(argv[i]))
+      UnresolvedArgs.push_back(argv[i]);
+  }
+
+  for (llvm::SmallVector<std::string, 5>::iterator I = UnresolvedArgs.begin(),
+       E = UnresolvedArgs.end(); I != E; ++I) {
+    if (!CheckerMgr->handleCheckerCmdOpt(*I))
+      DieOnBadCmdArg(*I);
   }
 
   std::string ErrorMsg;
@@ -130,15 +137,20 @@ int main(int argc, char **argv)
 
   llvm::SmallVector<const char *, 5> Args;
   Args.push_back(argv[0]);
-  Args.push_back(SrcFileName.c_str());
+  Args.push_back(CheckerMgr->getSrcFileName().c_str());
   Args.push_back("-fsyntax-only");
   llvm::sys::Path Path = GetExecutablePath(argv[0]);
   if (!CheckerMgr->initializeCompilerInstance(Args, Path.str(), ErrorMsg))
     Die(ErrorMsg);
 
-  int RV = CheckerMgr->doChecking();
+  int RV = CheckerMgr->doChecking(ErrorMsg);
+  if (RV) {
+    llvm::errs() << "Error: " << ErrorMsg << "\n";
+  }
+  else {
+    llvm::outs() << "Succeeded\n";
+  }
   CheckerManager::Finalize();
-
   return RV;
 }
 

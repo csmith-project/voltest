@@ -78,8 +78,11 @@ bool CheckerManager::initializeCompilerInstance(
   CheckerAssert(Comp && "NULL Compilation instance!");
 
   const driver::JobList &Jobs = Comp->getJobs();
-  CheckerAssert((Jobs.size() == 1) && isa<driver::Command>(*Jobs.begin()) &&
-                "Bad JobList!");
+  
+  if ((Jobs.size() != 1) || !isa<driver::Command>(*Jobs.begin())) {
+    ErrorMsg = "Bad joblist!";
+    return false;
+  }
 
   const driver::Command *Cmd = cast<driver::Command>(*Jobs.begin());
   CheckerAssert((llvm::StringRef(Cmd->getCreator().getName()) == "clang") &&
@@ -156,6 +159,18 @@ bool CheckerManager::initializeCompilerInstance(
   return true;
 }
 
+void CheckerManager::printCheckerOptions()
+{
+  CheckerAssert(CheckerManager::Instance);
+  
+  std::map<std::string, Checker *>::iterator I, E;
+  for (I = Instance->CheckersMap.begin(), 
+       E = Instance->CheckersMap.end();
+       I != E; ++I) {
+    (*I).second->printCmdOpts();
+  }
+}
+
 void CheckerManager::Finalize()
 {
   CheckerAssert(CheckerManager::Instance);
@@ -177,7 +192,7 @@ void CheckerManager::Finalize()
   Instance = NULL;
 }
 
-int CheckerManager::doChecking()
+int CheckerManager::doChecking(std::string &ErrorMsg)
 {
   ClangInstance->createSema(TU_Complete, 0);
   ClangInstance->getDiagnostics().setSuppressAllDiagnostics(true);
@@ -193,15 +208,26 @@ int CheckerManager::doChecking()
   ClangInstance->getDiagnosticClient().EndSourceFile();
 
   int RV = -1;
-  if (CurrentCheckerImpl->transSuccess())
+  if (CurrentCheckerImpl->isSuccess(ErrorMsg))
     RV = 0;
   return RV;
+}
+
+bool CheckerManager::handleCheckerCmdOpt(const std::string &Arg)
+{
+  if (!CurrentCheckerImpl)
+    return false;
+  return CurrentCheckerImpl->handleCmdOpt(Arg);
 }
 
 bool CheckerManager::verify(std::string &ErrorMsg)
 {
   if (!CurrentCheckerImpl) {
     ErrorMsg = "Empty checker instance!";
+    return false;
+  }
+  if (SrcFileName.empty()) {
+    ErrorMsg = "No input file!";
     return false;
   }
   return true;
