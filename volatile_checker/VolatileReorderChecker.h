@@ -38,6 +38,9 @@ private:
 
   void printAllFuncsWithVols();
 
+  bool handleOneQualType(const clang::FunctionDecl *CurrFD,
+                         const clang::QualType &QT);
+
   bool hasVolatileQual(const clang::QualType &QT);
 
   FunctionSet FuncsWithVols;

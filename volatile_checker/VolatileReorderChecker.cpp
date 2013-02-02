@@ -28,6 +28,8 @@ public:
 
   bool VisitDeclRefExpr(DeclRefExpr *DRE);
 
+  bool VisitMemberExpr(MemberExpr *ME);
+
 private:
   VolatileReorderChecker *ConsumerInstance;
 
@@ -36,15 +38,21 @@ private:
 
 bool VolatileAccessCollector::VisitDeclRefExpr(DeclRefExpr *DRE)
 {
+  // TODO: need to handle g.f1, where g is visited here,
+  // separate two cases, f1 is volatile or not
   const VarDecl *VD = dyn_cast<VarDecl>(DRE->getDecl());
   if (!VD)
     return true;
-  QualType QT = VD->getType();
-  if (ConsumerInstance->hasVolatileQual(QT)) {
-    ConsumerInstance->FuncsWithVols.insert(CurrFD);
-    return false;
-  }
-  return true;
+  return ConsumerInstance->handleOneQualType(CurrFD, VD->getType());
+}
+
+bool VolatileAccessCollector::VisitMemberExpr(MemberExpr *ME)
+{
+  const FieldDecl *D = dyn_cast<FieldDecl>(ME->getMemberDecl());
+  if (!D)
+    return true;
+
+  return ConsumerInstance->handleOneQualType(CurrFD, D->getType());
 }
 
 class VolatileAccessVisitor : public 
@@ -103,6 +111,16 @@ void VolatileReorderChecker::HandleTranslationUnit(ASTContext &Ctx)
   }
 }
 
+bool VolatileReorderChecker::handleOneQualType(const FunctionDecl *CurrFD,
+                                               const QualType &QT)
+{
+  if (hasVolatileQual(QT)) {
+    FuncsWithVols.insert(CurrFD);
+    return false;
+  }
+  return true;
+}
+
 bool VolatileReorderChecker::hasVolatileQual(const QualType &QT)
 {
   Qualifiers Quals = QT.getQualifiers();
@@ -119,7 +137,11 @@ bool VolatileReorderChecker::hasVolatileQual(const QualType &QT)
     const ArrayType *ATy = Context->getAsArrayType(QT);
     return hasVolatileQual(ATy->getElementType());
   }
-  // TODO: catch struct and struct field!
+  if (Ty->isRecordType()) {
+    // TODO
+    const RecordType *RT = Ty->getAs<RecordType>();
+    CheckerAssert(RT && "NULL RecordType!");
+  }
   return false;
 }
 
