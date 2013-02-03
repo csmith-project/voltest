@@ -2,6 +2,7 @@
 
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/Analysis/CallGraph.h"
 
 #include "CheckerManager.h"
 
@@ -21,7 +22,8 @@ public:
   VolatileAccessCollector(VolatileReorderChecker *Instance,
                           const FunctionDecl *FD)
     : ConsumerInstance(Instance),
-      CurrFD(FD)
+      CurrFD(FD),
+      IsFromMemberExpr(false)
   { }
 
   ~VolatileAccessCollector() { }
@@ -32,11 +34,123 @@ public:
 
   bool VisitRecordDecl(RecordDecl *RD);
 
+  bool VisitExplicitCastExpr(ExplicitCastExpr *CE);
+
 private:
   VolatileReorderChecker *ConsumerInstance;
 
   const FunctionDecl *CurrFD; 
+
+  bool IsFromMemberExpr;
 };
+
+class VolatileAccessVisitor : public 
+  RecursiveASTVisitor<VolatileAccessVisitor> {
+
+public:
+  explicit VolatileAccessVisitor(VolatileReorderChecker *Instance)
+    : ConsumerInstance(Instance),
+      MultipleVolAccesses(false)
+  { }
+
+  ~VolatileAccessVisitor() { }
+
+  bool VisitExpr(Expr *E);
+
+  bool hasMultipleVolAccesses() { return MultipleVolAccesses; }
+
+private:
+  VolatileReorderChecker *ConsumerInstance;
+
+  bool MultipleVolAccesses;
+};
+
+class ExpressionVolatileAccessVisitor : public 
+  RecursiveASTVisitor<ExpressionVolatileAccessVisitor> {
+
+public:
+  explicit ExpressionVolatileAccessVisitor(VolatileReorderChecker *Instance)
+    : ConsumerInstance(Instance),
+      NumVolAccesses(0),
+      IsFromMemberExpr(false)
+  { }
+
+  ~ExpressionVolatileAccessVisitor() { }
+
+  bool VisitDeclRefExpr(DeclRefExpr *DRE);
+
+  bool VisitMemberExpr(MemberExpr *ME);
+
+  bool VisitExplicitCastExpr(ExplicitCastExpr *CE);
+
+  bool VisitCallExpr(CallExpr *CE);
+
+  bool hasMultipleVolAccesses() { return (NumVolAccesses > 1); }
+
+private:
+  bool handleOneQualType(const QualType &QT);
+
+  VolatileReorderChecker *ConsumerInstance;
+
+  unsigned NumVolAccesses;
+
+  bool IsFromMemberExpr;
+};
+
+bool ExpressionVolatileAccessVisitor::handleOneQualType(const QualType &QT)
+{
+  if (ConsumerInstance->hasVolatileQual(QT)) {
+    NumVolAccesses++;
+  }
+  return !hasMultipleVolAccesses();
+}
+
+bool ExpressionVolatileAccessVisitor::VisitDeclRefExpr(DeclRefExpr *DRE)
+{
+  if (IsFromMemberExpr) {
+    IsFromMemberExpr = false;
+    return true;
+  }
+
+  IsFromMemberExpr = false;
+  const VarDecl *VD = dyn_cast<VarDecl>(DRE->getDecl());
+  if (!VD)
+    return true;
+  return handleOneQualType(VD->getType());
+}
+
+bool ExpressionVolatileAccessVisitor::VisitMemberExpr(MemberExpr *ME)
+{
+  if (IsFromMemberExpr) {
+    if (ME->getType().isVolatileQualified()) {
+      NumVolAccesses++;
+      return !hasMultipleVolAccesses();
+    }
+  }
+
+  const FieldDecl *D = dyn_cast<FieldDecl>(ME->getMemberDecl());
+  if (!D)
+    return true;
+
+  IsFromMemberExpr = true;
+  return handleOneQualType(D->getType());
+}
+
+bool ExpressionVolatileAccessVisitor::VisitExplicitCastExpr(ExplicitCastExpr *CE)
+{
+  return handleOneQualType(CE->getTypeAsWritten());
+}
+
+bool ExpressionVolatileAccessVisitor::VisitCallExpr(CallExpr *CE)
+{
+  const FunctionDecl *FD = CE->getDirectCallee();
+  // FIXME: not precise, for example, not considering function pointers
+  // conservatively increase NumVolAccesses...
+  if (!FD || ConsumerInstance->FuncsWithVols.count(FD->getCanonicalDecl())) {
+    NumVolAccesses++;
+  }
+  return !hasMultipleVolAccesses();
+}
 
 bool VolatileAccessCollector::VisitRecordDecl(RecordDecl *RD)
 {
@@ -89,8 +203,16 @@ bool VolatileAccessCollector::VisitRecordDecl(RecordDecl *RD)
 
 bool VolatileAccessCollector::VisitDeclRefExpr(DeclRefExpr *DRE)
 {
-  // TODO: need to handle g.f1, where g is visited here,
-  // separate two cases, f1 is volatile or not
+  // After visiting a MemberExprExpr such as g.f1, RecursiveASTVisitor
+  // will walk up to visit g. We don't want to do it, for example,
+  // struct S { int f1, volatile int f1 };
+  // handleOneQualType will treat g as volatile, but g.f1 is not.
+  if (IsFromMemberExpr) {
+    IsFromMemberExpr = false;
+    return true;
+  }
+
+  IsFromMemberExpr = false;
   const VarDecl *VD = dyn_cast<VarDecl>(DRE->getDecl());
   if (!VD)
     return true;
@@ -99,32 +221,48 @@ bool VolatileAccessCollector::VisitDeclRefExpr(DeclRefExpr *DRE)
 
 bool VolatileAccessCollector::VisitMemberExpr(MemberExpr *ME)
 {
+  if (IsFromMemberExpr) {
+    if (ME->getType().isVolatileQualified()) {
+      CheckerAssert(CurrFD && "NULL CurrFD!");
+      ConsumerInstance->FuncsWithVols.insert(CurrFD);
+      return false;
+    }
+    else {
+      return true;
+    }
+  }
+
   const FieldDecl *D = dyn_cast<FieldDecl>(ME->getMemberDecl());
   if (!D)
     return true;
 
+  IsFromMemberExpr = true;
   return ConsumerInstance->handleOneQualType(CurrFD, D->getType());
 }
 
-class VolatileAccessVisitor : public 
-  RecursiveASTVisitor<VolatileAccessVisitor> {
-
-public:
-  explicit VolatileAccessVisitor(VolatileReorderChecker *Instance)
-    : ConsumerInstance(Instance)
-  { }
-
-  ~VolatileAccessVisitor() { }
-
-  bool VisitDeclRefExpr(DeclRefExpr *DRE);
-
-private:
-  VolatileReorderChecker *ConsumerInstance;
-};
-
-bool VolatileAccessVisitor::VisitDeclRefExpr(DeclRefExpr *DRE)
+bool VolatileAccessCollector::VisitExplicitCastExpr(ExplicitCastExpr *CE)
 {
-  return true;
+  return ConsumerInstance->handleOneQualType(CurrFD, 
+           CE->getTypeAsWritten());
+}
+
+bool VolatileAccessVisitor::VisitExpr(Expr *E)
+{
+  if (BinaryOperator *BO = dyn_cast<BinaryOperator>(E)) {
+    if (BO->getOpcode() == BO_Comma) {
+      E = BO->getLHS();
+    }
+  }
+
+  ExpressionVolatileAccessVisitor V(ConsumerInstance);
+  V.TraverseStmt(E);
+  if (V.hasMultipleVolAccesses()) {
+    MultipleVolAccesses = true; 
+    return false;
+  }
+  else {
+    return true;
+  }
 }
 
 void VolatileReorderChecker::Initialize(ASTContext &context) 
@@ -154,10 +292,17 @@ bool VolatileReorderChecker::HandleTopLevelDecl(DeclGroupRef D)
 
 void VolatileReorderChecker::HandleTranslationUnit(ASTContext &Ctx)
 {
+  CallGraph CG;
+  CG.TraverseDecl(Context->getTranslationUnitDecl());
+  // Some functions do not access a volatile directly,
+  // but they could do it via their callees. 
+  // So need to update FuncsWithVols based on CallGraph
+  updateFuncsWithVols(CG);
   printAllFuncsWithVols();
 
   VolatileAccessVisitor AccessVisitor(this);
   AccessVisitor.TraverseDecl(Ctx.getTranslationUnitDecl());
+  Success = !AccessVisitor.hasMultipleVolAccesses();
 
   Ctx.getDiagnostics().setSuppressAllDiagnostics(false);
 
@@ -165,6 +310,36 @@ void VolatileReorderChecker::HandleTranslationUnit(ASTContext &Ctx)
       Ctx.getDiagnostics().hasFatalErrorOccurred()) {
     CheckerAssert(0 && "Fatal error during checing!");
   }
+}
+
+bool VolatileReorderChecker::visitCallGraphNode(const CallGraphNode *Node)
+{
+  bool VolFunc = false;
+  const FunctionDecl *FD = NULL;
+
+  CheckerAssert(Node && "NULL Node!");
+  if (const Decl *D = Node->getDecl()) {
+    FD = dyn_cast<FunctionDecl>(D);
+    if (FD)
+      VolFunc = FuncsWithVols.count(FD->getCanonicalDecl()) ? true : false;
+  }
+
+  bool hasVolAccess = false;
+  for (CallGraphNode::const_iterator I = Node->begin(), E = Node->end();
+       I != E; ++I) {
+    hasVolAccess = visitCallGraphNode(*I) || hasVolAccess;
+  }
+  if (FD && hasVolAccess && !VolFunc) {
+    FuncsWithVols.insert(FD->getCanonicalDecl());
+  }
+
+  return (VolFunc || hasVolAccess);
+}
+
+void VolatileReorderChecker::updateFuncsWithVols(const CallGraph &CG)
+{
+  const CallGraphNode *Root = CG.getRoot();
+  visitCallGraphNode(Root);
 }
 
 bool VolatileReorderChecker::handleOneQualType(const FunctionDecl *CurrFD,

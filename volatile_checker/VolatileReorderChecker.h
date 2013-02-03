@@ -12,12 +12,16 @@ namespace clang {
   class FunctionDecl;
   class QualType;
   class RecordDecl;
+  class CallGraph;
+  class CallGraphNode;
 }
 
 class VolatileAccessCollector;
+class ExpressionVolatileAccessVisitor;
 
 class VolatileReorderChecker : public Checker {
 friend class VolatileAccessCollector;
+friend class ExpressionVolatileAccessVisitor;
 
 public:
 
@@ -45,6 +49,10 @@ private:
                          const clang::QualType &QT);
 
   bool hasVolatileQual(const clang::QualType &QT);
+
+  void updateFuncsWithVols(const clang::CallGraph &CG);
+
+  bool visitCallGraphNode(const clang::CallGraphNode *Node);
 
   FunctionSet FuncsWithVols;
 
