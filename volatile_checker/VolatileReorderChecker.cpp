@@ -30,11 +30,62 @@ public:
 
   bool VisitMemberExpr(MemberExpr *ME);
 
+  bool VisitRecordDecl(RecordDecl *RD);
+
 private:
   VolatileReorderChecker *ConsumerInstance;
 
   const FunctionDecl *CurrFD; 
 };
+
+bool VolatileAccessCollector::VisitRecordDecl(RecordDecl *RD)
+{
+  if (ConsumerInstance->VisitedRecords.count(
+        dyn_cast<RecordDecl>(RD->getCanonicalDecl()))) {
+    return true;
+  }
+
+  ConsumerInstance->VisitedRecords.insert(
+    dyn_cast<RecordDecl>(RD->getCanonicalDecl()));
+
+  for (RecordDecl::field_iterator I = RD->field_begin(), E = RD->field_end();
+       I != E; ++I) {
+    const FieldDecl *D = (*I);
+    QualType QT = D->getType();
+    if (QT.isVolatileQualified()) {
+      ConsumerInstance->RecordsWithVols.insert(
+        dyn_cast<RecordDecl>(RD->getCanonicalDecl()));
+      return true;
+    }
+    
+    const Type *Ty = QT.getTypePtr();
+    if (Ty->isRecordType()) {
+      const RecordType *RT = Ty->getAs<RecordType>();
+      const RecordDecl *SubRD = RT->getDecl();
+      CheckerAssert(SubRD && "NULL SubRD!");
+  
+      // handle nested struct definition
+      if (!ConsumerInstance->VisitedRecords.count(
+            dyn_cast<RecordDecl>(SubRD->getCanonicalDecl()))) {
+        RecordDecl *SubDef = SubRD->getDefinition();
+        if (!SubDef)
+          continue;
+
+        VolatileAccessCollector Collector(ConsumerInstance, NULL);
+        Collector.TraverseDecl(SubDef);
+      }
+
+      if (ConsumerInstance->RecordsWithVols.count(
+            dyn_cast<RecordDecl>(SubRD->getCanonicalDecl()))) {
+
+        ConsumerInstance->RecordsWithVols.insert(
+          dyn_cast<RecordDecl>(RD->getCanonicalDecl()));
+        return true;
+      }
+    }
+  }
+  return true;
+}
 
 bool VolatileAccessCollector::VisitDeclRefExpr(DeclRefExpr *DRE)
 {
@@ -84,10 +135,15 @@ void VolatileReorderChecker::Initialize(ASTContext &context)
 bool VolatileReorderChecker::HandleTopLevelDecl(DeclGroupRef D)
 {
   for (DeclGroupRef::iterator I = D.begin(), E = D.end(); I != E; ++I) {
-    FunctionDecl *FD = dyn_cast<FunctionDecl>(*I);
-    if (!FD)
+    RecordDecl *RD = dyn_cast<RecordDecl>(*I);
+    if (RD && RD->isThisDeclarationADefinition()) {
+      VolatileAccessCollector Collector(this, NULL);
+      Collector.TraverseDecl(RD);
       continue;
-    if (!FD->isThisDeclarationADefinition())
+    }
+
+    FunctionDecl *FD = dyn_cast<FunctionDecl>(*I);
+    if (!FD || !FD->isThisDeclarationADefinition())
       continue;
     const FunctionDecl *CanonicalFD = FD->getCanonicalDecl();
     VolatileAccessCollector Collector(this, CanonicalFD);
@@ -114,6 +170,7 @@ void VolatileReorderChecker::HandleTranslationUnit(ASTContext &Ctx)
 bool VolatileReorderChecker::handleOneQualType(const FunctionDecl *CurrFD,
                                                const QualType &QT)
 {
+  CheckerAssert(CurrFD && "NULL CurrFD!");
   if (hasVolatileQual(QT)) {
     FuncsWithVols.insert(CurrFD);
     return false;
@@ -123,9 +180,7 @@ bool VolatileReorderChecker::handleOneQualType(const FunctionDecl *CurrFD,
 
 bool VolatileReorderChecker::hasVolatileQual(const QualType &QT)
 {
-  Qualifiers Quals = QT.getQualifiers();
-
-  if (Quals.hasVolatile()) {
+  if (QT.isVolatileQualified()) {
     return true;
   }
 
@@ -138,9 +193,11 @@ bool VolatileReorderChecker::hasVolatileQual(const QualType &QT)
     return hasVolatileQual(ATy->getElementType());
   }
   if (Ty->isRecordType()) {
-    // TODO
     const RecordType *RT = Ty->getAs<RecordType>();
     CheckerAssert(RT && "NULL RecordType!");
+    const RecordDecl *RD = RT->getDecl();
+    if (RecordsWithVols.count(dyn_cast<RecordDecl>(RD->getCanonicalDecl())))
+      return true;
   }
   return false;
 }

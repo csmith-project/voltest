@@ -11,6 +11,7 @@ namespace clang {
   class DeclGroupRef;
   class FunctionDecl;
   class QualType;
+  class RecordDecl;
 }
 
 class VolatileAccessCollector;
@@ -30,6 +31,8 @@ private:
 
   typedef llvm::SmallPtrSet<const clang::FunctionDecl *, 10> FunctionSet;
 
+  typedef llvm::SmallPtrSet<const clang::RecordDecl *, 10> RecordDeclSet;
+
   virtual void Initialize(clang::ASTContext &context);
 
   virtual void HandleTranslationUnit(clang::ASTContext &Ctx);
@@ -44,6 +47,12 @@ private:
   bool hasVolatileQual(const clang::QualType &QT);
 
   FunctionSet FuncsWithVols;
+
+  // record decls that have volatile fields (including sub-struct-field
+  // with volatiles, recursively)
+  RecordDeclSet RecordsWithVols;
+
+  RecordDeclSet VisitedRecords;
 
   // Unimplemented
   VolatileReorderChecker();
