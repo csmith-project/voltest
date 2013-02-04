@@ -15,6 +15,8 @@ static const char *DescriptionMsg =
 static RegisterChecker<VolatileReorderChecker>
          C("volatile-reorder", DescriptionMsg);
 
+typedef llvm::SmallVector<const Expr *, 5> ExprVector;
+
 class VolatileAccessCollector : public 
   RecursiveASTVisitor<VolatileAccessCollector> {
 
@@ -85,24 +87,46 @@ public:
 
   bool VisitCallExpr(CallExpr *CE);
 
+  bool VisitBinaryOperator(BinaryOperator *BO);
+
   bool hasMultipleVolAccesses() { return (NumVolAccesses > 1); }
 
+  int getNumVolAccesses() { return NumVolAccesses; }
+
+  void getVolAccesses(ExprVector &Accesses);
+
+  void addOneVolAccess(const Expr *E);
+
 private:
-  bool handleOneQualType(const QualType &QT);
+  bool hasVol(const QualType &QT);
 
   VolatileReorderChecker *ConsumerInstance;
 
-  unsigned NumVolAccesses;
+  ExprVector VolAccesses;
+
+  int NumVolAccesses;
 
   bool IsFromMemberExpr;
 };
 
-bool ExpressionVolatileAccessVisitor::handleOneQualType(const QualType &QT)
+void ExpressionVolatileAccessVisitor::getVolAccesses(ExprVector &Accesses)
+{
+  Accesses = VolAccesses;
+}
+
+bool ExpressionVolatileAccessVisitor::hasVol(const QualType &QT)
 {
   if (ConsumerInstance->hasVolatileQual(QT)) {
     NumVolAccesses++;
+    return true;
   }
-  return !hasMultipleVolAccesses();
+  return false;
+}
+
+void ExpressionVolatileAccessVisitor::addOneVolAccess(const Expr *E)
+{
+  CheckerAssert(E && "Null Expr!");
+  VolAccesses.push_back(E); 
 }
 
 bool ExpressionVolatileAccessVisitor::VisitDeclRefExpr(DeclRefExpr *DRE)
@@ -116,40 +140,79 @@ bool ExpressionVolatileAccessVisitor::VisitDeclRefExpr(DeclRefExpr *DRE)
   const VarDecl *VD = dyn_cast<VarDecl>(DRE->getDecl());
   if (!VD)
     return true;
-  return handleOneQualType(VD->getType());
+  if (hasVol(VD->getType())) {
+    addOneVolAccess(DRE);
+  }
+  return !hasMultipleVolAccesses();
 }
 
 bool ExpressionVolatileAccessVisitor::VisitMemberExpr(MemberExpr *ME)
 {
-  if (IsFromMemberExpr) {
-    if (ME->getType().isVolatileQualified()) {
-      NumVolAccesses++;
-      return !hasMultipleVolAccesses();
-    }
-  }
+  if (IsFromMemberExpr)
+    return true;
 
   const FieldDecl *D = dyn_cast<FieldDecl>(ME->getMemberDecl());
   if (!D)
     return true;
 
   IsFromMemberExpr = true;
-  return handleOneQualType(D->getType());
+  if (hasVol(D->getType()))
+    addOneVolAccess(ME);
+
+  return !hasMultipleVolAccesses();
 }
 
 bool ExpressionVolatileAccessVisitor::VisitExplicitCastExpr(ExplicitCastExpr *CE)
 {
-  return handleOneQualType(CE->getTypeAsWritten());
+  if (hasVol(CE->getTypeAsWritten()))
+    addOneVolAccess(CE);
+
+  return !hasMultipleVolAccesses();
 }
 
 bool ExpressionVolatileAccessVisitor::VisitCallExpr(CallExpr *CE)
 {
+  ExpressionVolatileAccessVisitor V(ConsumerInstance);
+  for (CallExpr::arg_iterator I = CE->arg_begin(), E = CE->arg_end();
+       I != E; ++I) {
+    V.TraverseStmt(*I);
+    if (V.hasMultipleVolAccesses()) {
+      NumVolAccesses = V.getNumVolAccesses(); 
+      V.getVolAccesses(VolAccesses);
+      return false;
+    }
+  }
+
+  for (int I = V.getNumVolAccesses(); I > 0; --I) {
+    NumVolAccesses--;
+  }
+
   const FunctionDecl *FD = CE->getDirectCallee();
   // FIXME: not precise, for example, not considering function pointers
   // conservatively increase NumVolAccesses...
   if (!FD || ConsumerInstance->FuncsWithVols.count(FD->getCanonicalDecl())) {
     NumVolAccesses++;
+    addOneVolAccess(CE);
   }
   return !hasMultipleVolAccesses();
+}
+
+bool ExpressionVolatileAccessVisitor::VisitBinaryOperator(BinaryOperator *BO)
+{
+  BinaryOperator::Opcode Op = BO->getOpcode();
+  if ((Op == BO_Comma) ||
+      (Op == BO_LAnd) || 
+      (Op == BO_LOr)) {
+    Expr *E = BO->getLHS();
+    ExpressionVolatileAccessVisitor V(ConsumerInstance);
+    V.TraverseStmt(E);
+    if (V.hasMultipleVolAccesses()) {
+      NumVolAccesses = V.getNumVolAccesses(); 
+      V.getVolAccesses(VolAccesses);
+    }
+    return false;
+  }
+  return true;
 }
 
 bool VolatileAccessCollector::VisitRecordDecl(RecordDecl *RD)
@@ -248,16 +311,19 @@ bool VolatileAccessCollector::VisitExplicitCastExpr(ExplicitCastExpr *CE)
 
 bool VolatileAccessVisitor::VisitExpr(Expr *E)
 {
-  if (BinaryOperator *BO = dyn_cast<BinaryOperator>(E)) {
-    if (BO->getOpcode() == BO_Comma) {
-      E = BO->getLHS();
-    }
+  if (dyn_cast<InitListExpr>(E)) {
+    return true;
   }
 
   ExpressionVolatileAccessVisitor V(ConsumerInstance);
   V.TraverseStmt(E);
   if (V.hasMultipleVolAccesses()) {
-    MultipleVolAccesses = true; 
+    MultipleVolAccesses = true;
+    ConsumerInstance->OffensiveExpr = E;
+    V.getVolAccesses(ConsumerInstance->VolAccesses);
+    CheckerAssert((V.getNumVolAccesses() == 
+                     static_cast<int>(ConsumerInstance->VolAccesses.size())) &&
+                  "Unmatched Vol Accesses!");
     return false;
   }
   else {
@@ -303,6 +369,28 @@ void VolatileReorderChecker::HandleTranslationUnit(ASTContext &Ctx)
   VolatileAccessVisitor AccessVisitor(this);
   AccessVisitor.TraverseDecl(Ctx.getTranslationUnitDecl());
   Success = !AccessVisitor.hasMultipleVolAccesses();
+  if (!Success) {
+    CheckerAssert((VolAccesses.size() > 1) && 
+                  "size of VolAccesses must be greater than 1!");
+    CheckerAssert(OffensiveExpr && "Invalid OffensiveExpr!");
+    CheckMsg = "Offensive Expr is at line ";
+
+    std::string ES;
+    getExprLineNumStr(OffensiveExpr, ES);
+    CheckMsg += ES;
+    CheckMsg += ": ";
+    getExprString(OffensiveExpr, ES);
+    CheckMsg += ES;
+    CheckMsg += "\n  multiple volatile accesses:\n";
+    
+    for (ExprVector::iterator I = VolAccesses.begin(), E = VolAccesses.end();
+         I != E; ++I) {
+      getExprString(*I, ES);
+      CheckMsg += "  ";
+      CheckMsg += ES;
+      CheckMsg += "\n";
+    }
+  }
 
   Ctx.getDiagnostics().setSuppressAllDiagnostics(false);
 

@@ -27,7 +27,7 @@ INCLUDES = ${LLVM_CXXFLAGS} -I${llvm_dir}/include/clang
 LDFLAGS = ${LLVM_LDFLAGS}
 LIBS = -lclangFrontendTool -lclangFrontend -lclangDriver -lclangSerialization \
        -lclangCodeGen -lclangParse -lclangSema -lclangAnalysis \
-       -lclangEdit -lclangAST -lclangLex -lclangBasic \
+       -lclangEdit -lclangAST -lclangLex -lclangBasic -lclangRewriteCore \
        ${LLVM_LIBS} -ldl
 
 CHECKER_HEADERS = AccessOnceChecker.h \

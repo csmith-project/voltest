@@ -4,6 +4,7 @@
 #include <string>
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SmallVector.h"
 #include "Checker.h"
 
 namespace clang {
@@ -17,10 +18,12 @@ namespace clang {
 }
 
 class VolatileAccessCollector;
+class VolatileAccessVisitor;
 class ExpressionVolatileAccessVisitor;
 
 class VolatileReorderChecker : public Checker {
 friend class VolatileAccessCollector;
+friend class VolatileAccessVisitor;
 friend class ExpressionVolatileAccessVisitor;
 
 public:
@@ -37,11 +40,17 @@ private:
 
   typedef llvm::SmallPtrSet<const clang::RecordDecl *, 10> RecordDeclSet;
 
+  typedef llvm::SmallVector<const clang::Expr *, 5> ExprVector;
+
   virtual void Initialize(clang::ASTContext &context);
 
   virtual void HandleTranslationUnit(clang::ASTContext &Ctx);
 
   virtual bool HandleTopLevelDecl(clang::DeclGroupRef D);
+
+  const clang::Expr *OffensiveExpr;
+
+  ExprVector VolAccesses;
 
   void printAllFuncsWithVols();
 

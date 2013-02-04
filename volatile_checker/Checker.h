@@ -4,6 +4,7 @@
 #include <string>
 #include <set>
 #include "clang/AST/ASTConsumer.h"
+#include "clang/Rewrite/Core/Rewriter.h"
 
 #ifndef ENABLE_CHECKER_ASSERT
   #define CheckerAssert(x) {if (!(x)) exit(0);}
@@ -13,6 +14,7 @@
 
 namespace clang {
   class ASTContext;
+  class Expr;
 }
 
 class Checker : public clang::ASTConsumer {
@@ -48,6 +50,10 @@ protected:
 
   typedef std::set<std::string> StringSet;
 
+  void getExprString(const clang::Expr *E, std::string &ES);
+
+  void getExprLineNumStr(const clang::Expr *E, std::string &ES);
+
   virtual bool handleValueCmdOpt(const std::string &/*ArgStr*/,
                                  size_t /*SepPos*/) {
     return false;
@@ -71,6 +77,8 @@ protected:
   clang::ASTContext *Context;
 
   std::string DescriptionString;
+  
+  clang::Rewriter TheRewriter;
 };
 
 #endif

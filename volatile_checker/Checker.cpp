@@ -11,6 +11,8 @@ using namespace clang;
 void Checker::Initialize(ASTContext &context) 
 {
   Context = &context;
+  TheRewriter.setSourceMgr(Context->getSourceManager(),
+                           Context->getLangOpts());
 }
 
 bool Checker::handleCmdOpt(const std::string &Arg)
@@ -40,6 +42,35 @@ void Checker::splitString(const std::string &Str, char Delim,
       continue;
     Elems.insert(OneElem);
   }
+}
+
+void Checker::getExprLineNumStr(const Expr *E, std::string &ES)
+{
+  SourceRange ExprRange = E->getSourceRange();
+  CheckerAssert(ExprRange.isValid() && "Invalid ExprRange!");
+  unsigned Ln = 
+    Context->getSourceManager().getSpellingLineNumber(ExprRange.getBegin());
+  llvm::raw_string_ostream SS(ES);
+  SS << Ln;
+}
+
+void Checker::getExprString(const Expr *E, std::string &ES)
+{
+  SourceRange ExprRange = E->getSourceRange();
+  int RangeSize = TheRewriter.getRangeSize(ExprRange);
+  CheckerAssert((RangeSize != -1) && "Invalid Range Size!");
+
+  SourceLocation StartLoc = ExprRange.getBegin();
+  const char *StartBuf = 
+    Context->getSourceManager().getCharacterData(StartLoc);
+
+  ES.assign(StartBuf, RangeSize);
+
+  const BinaryOperator *BinOp = dyn_cast<BinaryOperator>(E);
+
+  // Keep the semantics of Comma operator
+  if (BinOp && (BinOp->getOpcode() == BO_Comma))
+    ES = "(" + ES + ")";
 }
 
 Checker::~Checker()
