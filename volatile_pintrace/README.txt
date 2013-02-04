@@ -81,7 +81,11 @@ Some details about pinatrace:
 
   * -random_read
     pass random values to volatile reads rather than original values
-  
+    To see how it work, you can try rand_val_test1.c:
+
+    (1) gcc rand_val_test1.c
+    (2) $PIN_HOME/pin.sh -injection child -t $PIN_HOME/source/tools/ManualExamples/obj-intel64/pinatrace.so -vol_input vol_addr.txt -output_mode checksum -random_read -- ./a.out
+
   * -seed num  
     pintool will use the passed seed rather than a random one
 
