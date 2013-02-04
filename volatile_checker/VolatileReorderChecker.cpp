@@ -10,7 +10,8 @@ using namespace clang;
 using namespace llvm;
 
 static const char *DescriptionMsg =
-"\n"; 
+"Check if there is at most one volatile access between two sequence pointers. \
+Return 0 upon success. \n"; 
 
 static RegisterChecker<VolatileReorderChecker>
          C("volatile-reorder", DescriptionMsg);
@@ -467,10 +468,12 @@ bool VolatileReorderChecker::hasVolatileQual(const QualType &QT)
 
 void VolatileReorderChecker::printAllFuncsWithVols()
 {
+  llvm::outs() << "Functions that have volatile accesses: \n";
   for (FunctionSet::iterator I = FuncsWithVols.begin(), E = FuncsWithVols.end();
        I != E; ++I) {
-    llvm::outs() << (*I)->getNameAsString() << "\n";
+    llvm::outs() << "  " << (*I)->getNameAsString() << "\n";
   }
+  llvm::outs() << "\n";
 }
 
 VolatileReorderChecker::~VolatileReorderChecker()
