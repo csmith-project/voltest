@@ -1,0 +1,28 @@
+diff --git a/utah/scripts/old_john_driver/evaluate_program.pl b/utah/scripts/old_john_driver/evaluate_program.pl
+index 259b0b6..b30ae06 100755
+--- a/utah/scripts/old_john_driver/evaluate_program.pl
++++ b/utah/scripts/old_john_driver/evaluate_program.pl
+@@ -52,7 +52,7 @@ my $NO_VOLCHECK = 0;
+ my $USE_VOLCHECK = 1;
+ my $USE_PINTOOL = 2;
+ 
+-my $CHECK_VOLATILE = $NO_VOLCHECK;
++my $CHECK_VOLATILE = $USE_VOLCHECK;
+ 
+ if (defined($ENV{"PIN_CMD"})) {
+     $CHECK_VOLATILE = $USE_PINTOOL;
+diff --git a/utah/scripts/old_john_driver/random_test.pl b/utah/scripts/old_john_driver/random_test.pl
+index d5c35f8..8d7ab8f 100755
+--- a/utah/scripts/old_john_driver/random_test.pl
++++ b/utah/scripts/old_john_driver/random_test.pl
+@@ -84,8 +84,8 @@ my $platform = "x86_64";
+ my $CSMITH_CCOMP = "";
+ 
+ # set up pintool for volatile testing
+-my $use_pintool = 0;
+-# my $use_pintool = 1;
++# my $use_pintool = 0;
++my $use_pintool = 1;
+ 
+ #my $PIN_MODE = "-output_mode verbose"; # We are not supporting it right now
+ my $PIN_MODE = "";

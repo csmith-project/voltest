@@ -1,0 +1,18 @@
+## -*- mode: Tcl -*-
+##
+
+###############################################################################
+
+set ns [new Simulator]
+source tb_compat.tcl
+
+set imp [$ns node]
+tb-set-hardware $imp pc3000
+tb-set-node-os $imp UBUNTU12-64-STD
+
+$ns rtproto Static
+$ns run
+
+###############################################################################
+
+## End of file.
