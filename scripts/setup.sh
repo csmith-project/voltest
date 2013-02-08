@@ -1,5 +1,10 @@
 #!/bin/sh
 ##
+## TODOs:
+## + Move downloaded tarballs to a downloads directory?
+## + Delete the downloaded tarballs?
+## + Remove the llvm-build directory?
+## + Build less of LLVM/Clang?
 
 ###############################################################################
 
@@ -51,7 +56,7 @@ echo "*** [$time]" "Setting up Csmith..."
 # Get Cmith.
 #
 time=`date +%H:%M:%S`
-echo "*** [$time]" "  Acquiring Csmith..."
+echo "*** [$time]" "  Acquiring Csmith sources..."
 #
 git clone $quiet "$CSMITH_GIT" "$CSMITH_HOME"
 
@@ -81,12 +86,16 @@ sudo apt-get $quiet -y install liblockfile-simple-perl
 # mkdir csmith
 # cd csmith
 
+# Configure.
+#
 time=`date +%H:%M:%S`
 echo "*** [$time]" "  Configuring Csmith..."
 #
 cd "$CSMITH_HOME"
 ./configure > Configure.errs
 
+# Compile.
+#
 time=`date +%H:%M:%S`
 echo "*** [$time]" "  Compiling Csmith..."
 #
@@ -98,7 +107,7 @@ make > Make.errs 2>&1
 
 ###############################################################################
 
-## SET UP PIN and VOLATILE_PINTRACE
+## SET UP PIN AND VOLATILE_PINTRACE
 
 time=`date +%H:%M:%S`
 echo "*** [$time]" "Setting up volatile_pintrace..."
@@ -106,7 +115,7 @@ echo "*** [$time]" "Setting up volatile_pintrace..."
 # Get volatile_pintrace.
 #
 time=`date +%H:%M:%S`
-echo "*** [$time]" "  Acquiring volatile_pintrace..."
+echo "*** [$time]" "  Acquiring volatile_pintrace sources..."
 
 svn co $quiet "$VOLATILE_PINTRACE_SVN" "$VOLATILE_PINTRACE_HOME"
 
@@ -144,6 +153,120 @@ echo "*** [$time]" "  Patching Csmith driver for volatile_pintrace..."
 #
 patch $silent -d "$CSMITH_HOME/utah/scripts/old_john_driver" < \
   "$VOLTEST_HOME/patches/csmith/volatile_pintrace.patch"
+
+###############################################################################
+
+## SET UP LLVM/CLANG (FOR C-REDUCE)
+
+time=`date +%H:%M:%S`
+echo "*** [$time]" "Setting up LLVM/Clang..."
+
+# Get LLVM.
+#
+time=`date +%H:%M:%S`
+echo "*** [$time]" "  Acquiring LLVM sources..."
+#
+cd "$WORK_SRC_HOME"
+wget $quiet "$LLVM_URL"
+tar zxf "$LLVM_TGZ"
+
+# Get Clang.
+#
+time=`date +%H:%M:%S`
+echo "*** [$time]" "  Acquiring Clang sources..."
+#
+cd "$WORK_SRC_HOME"
+wget $quiet "$LLVM_CLANG_URL"
+tar zxf "$LLVM_CLANG_TGZ"
+# Move this into the LLVM source tree; part of the LLVM/Clang build procedure.
+# See <http://clang.llvm.org/get_started.html>.
+mv "$LLVM_CLANG_DIR" "$LLVM_SRC_HOME/tools/clang"
+
+# Get Compiler RT.
+#
+time=`date +%H:%M:%S`
+echo "*** [$time]" "  Acquiring Compiler RT sources..."
+#
+cd "$WORK_SRC_HOME"
+wget $quiet "$LLVM_COMPILER_RT_URL"
+tar zxf "$LLVM_COMPILER_RT_TGZ"
+# Move into the LLVM source tree; part of the LLVM/Clang build procedure.
+# See <http://clang.llvm.org/get_started.html>.
+mv "$LLVM_COMPILER_RT_DIR" "$LLVM_SRC_HOME/projects/compiler-rt"
+
+# Make LLVM+Clang+Compiler-RT build tree.
+#
+mkdir "$LLVM_OBJ_HOME"
+
+# Configure.
+#
+time=`date +%H:%M:%S`
+echo "*** [$time]" "  Configuring LLVM+Clang+Compiler-RT..."
+#
+cd "$LLVM_OBJ_HOME"
+"$LLVM_SRC_HOME"/configure --prefix="$LLVM_HOME" > Configure.errs
+
+# Compile.
+# This takes about 120 minutes on a pc3000.
+#
+time=`date +%H:%M:%S`
+echo "*** [$time]" "  Compiling LLVM+Clang+Compiler-RT..."
+#
+make > Make.errs 2>&1
+
+# Install.
+# The C-Reduce build system only works against an installed LLVM/Clang,
+# not an LLVM+Clang build tree.
+#
+time=`date +%H:%M:%S`
+echo "*** [$time]" "  Installing LLVM+Clang+Compiler-RT..."
+#
+make install > Make-install.errs 2>&1
+
+###############################################################################
+
+## SET UP C-REDUCE
+
+time=`date +%H:%M:%S`
+echo "*** [$time]" "Setting up C-Reduce..."
+
+# Get C-Reduce.
+#
+time=`date +%H:%M:%S`
+echo "*** [$time]" "  Acquiring C-Reduce sources..."
+#
+git clone $quiet "$CREDUCE_GIT" "$CREDUCE_HOME"
+
+# Install things required by C-Reduce.
+#
+time=`date +%H:%M:%S`
+echo "*** [$time]" "  Installing C-Reduce dependencies..."
+#
+sudo apt-get $quiet -y install \
+  astyle \
+  delta \
+  indent \
+  libbenchmark-timer-perl \
+  libexporter-lite-perl \
+  libfile-which-perl \
+  libregexp-common-perl \
+  libsys-cpu-perl
+
+# Configure.
+#
+time=`date +%H:%M:%S`
+echo "*** [$time]" "  Configuring C-Reduce..."
+#
+cd "$CREDUCE_HOME"
+./configure --with-llvm="$LLVM_HOME" > Configure.errs
+
+# Compile.
+#
+time=`date +%H:%M:%S`
+echo "*** [$time]" "  Compiling C-Reduce..."
+#
+make > Make.errs 2>&1
+# make install
 
 ###############################################################################
 
