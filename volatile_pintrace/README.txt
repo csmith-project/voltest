@@ -21,23 +21,11 @@ Volatile tests howto:
     )
 
   To do volatile tests using volatile scripts, you only need to 
-  modify some scripts in csmith/utah/scripts/old_john_driver
+  setup CSMITH_HOME, and either:
 
-  * open evaluate_program.pl: 
-  change 
-    my $CHECK_VOLATILE = $NO_VOLCHECK;
-  to
-    my $CHECK_VOLATILE = $USE_VOLCHECK;
-    
-  * open random_test.pl
-  change:
-    my $use_pintool = 0;
-  to
-    my $use_pintool = 1;
-
-  (enabling it will pass "--enable-volatile-tests [x86|x86_64] --vol-addr-file vol_addr.txt" to csmith)
-
-  * do normal test using launchn.pl
+  * ./launchn.pl  or 
+  
+  * ./volatile_test.pl  (use ./volatile_test.pl --help to check its usage)
 
 Some details about pinatrace:
 
