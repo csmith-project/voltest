@@ -77,7 +77,8 @@ public:
   explicit ExpressionVolatileAccessVisitor(VolatileReorderChecker *Instance)
     : ConsumerInstance(Instance),
       NumVolAccesses(0),
-      IsFromMemberExpr(false)
+      IsFromMemberExpr(false),
+      IsFromAddrTaken(false)
   { }
 
   ~ExpressionVolatileAccessVisitor() { }
@@ -112,6 +113,8 @@ private:
   int NumVolAccesses;
 
   bool IsFromMemberExpr;
+
+  bool IsFromAddrTaken;
 };
 
 void ExpressionVolatileAccessVisitor::getVolAccesses(ExprVector &Accesses)
@@ -140,11 +143,21 @@ bool ExpressionVolatileAccessVisitor::VisitDeclRefExpr(DeclRefExpr *DRE)
     IsFromMemberExpr = false;
     return true;
   }
-
   IsFromMemberExpr = false;
+
   const VarDecl *VD = dyn_cast<VarDecl>(DRE->getDecl());
   if (!VD)
     return true;
+
+  // only need to check the qualifiers on the type, don't recursively 
+  // get into the nested type, e.g. struct fields
+  if (IsFromAddrTaken) {
+    IsFromAddrTaken = false;
+    if (VD->getType().isVolatileQualified())
+        addOneVolAccess(DRE);
+    return !hasMultipleVolAccesses();
+  }
+  
   if (hasVol(VD->getType())) {
     addOneVolAccess(DRE);
   }
@@ -223,6 +236,9 @@ bool ExpressionVolatileAccessVisitor::VisitBinaryOperator(BinaryOperator *BO)
 bool ExpressionVolatileAccessVisitor::VisitUnaryOperator(UnaryOperator *UO)
 {
   UnaryOperator::Opcode Op = UO->getOpcode();
+  if (Op == UO_AddrOf)
+    IsFromAddrTaken = true;
+
   if ((Op == UO_AddrOf) || (Op == UO_Deref)) {
     Expr *E = UO->getSubExpr();
     ExpressionVolatileAccessVisitor V(ConsumerInstance);
@@ -230,11 +246,15 @@ bool ExpressionVolatileAccessVisitor::VisitUnaryOperator(UnaryOperator *UO)
     if (V.hasMultipleVolAccesses()) {
       NumVolAccesses = V.getNumVolAccesses(); 
       V.getVolAccesses(VolAccesses);
+      return false;
     }
     // dont' count cases like
     // volatile int * volatile p; int foo() { return *p; }
     // as 2 volatile accesses;
-    if ((V.getNumVolAccesses() == 0) && hasVol(UO->getType()))
+    if (V.getNumVolAccesses() != 0)
+      return true;
+
+    if (hasVol(UO->getType()))
       addOneVolAccess(UO);
   }
   return !hasMultipleVolAccesses();
