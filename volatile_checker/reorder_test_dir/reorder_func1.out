@@ -1,0 +1,8 @@
+Functions that have volatile accesses: 
+  f1
+  f2
+  f3
+  f6
+  main
+
+Succeeded

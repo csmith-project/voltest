@@ -1,0 +1,10 @@
+Error: Offensive Expr is at line 5: g1 + g1
+  multiple volatile accesses:
+  g1
+  g1
+
+Functions that have volatile accesses: 
+  f1
+  f2
+  f3
+

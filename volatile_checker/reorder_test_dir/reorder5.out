@@ -1,0 +1,5 @@
+Functions that have volatile accesses: 
+  f1
+  f2
+
+Succeeded
