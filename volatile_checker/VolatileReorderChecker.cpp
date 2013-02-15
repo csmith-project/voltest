@@ -39,6 +39,8 @@ public:
 
   bool VisitExplicitCastExpr(ExplicitCastExpr *CE);
 
+  bool VisitUnaryOperator(UnaryOperator *UO);
+
 private:
   VolatileReorderChecker *ConsumerInstance;
 
@@ -89,6 +91,8 @@ public:
   bool VisitCallExpr(CallExpr *CE);
 
   bool VisitBinaryOperator(BinaryOperator *BO);
+
+  bool VisitUnaryOperator(UnaryOperator *UO);
 
   bool hasMultipleVolAccesses() { return (NumVolAccesses > 1); }
 
@@ -216,6 +220,26 @@ bool ExpressionVolatileAccessVisitor::VisitBinaryOperator(BinaryOperator *BO)
   return true;
 }
 
+bool ExpressionVolatileAccessVisitor::VisitUnaryOperator(UnaryOperator *UO)
+{
+  UnaryOperator::Opcode Op = UO->getOpcode();
+  if ((Op == UO_AddrOf) || (Op == UO_Deref)) {
+    Expr *E = UO->getSubExpr();
+    ExpressionVolatileAccessVisitor V(ConsumerInstance);
+    V.TraverseStmt(E);
+    if (V.hasMultipleVolAccesses()) {
+      NumVolAccesses = V.getNumVolAccesses(); 
+      V.getVolAccesses(VolAccesses);
+    }
+    // dont' count cases like
+    // volatile int * volatile p; int foo() { return *p; }
+    // as 2 volatile accesses;
+    if ((V.getNumVolAccesses() == 0) && hasVol(UO->getType()))
+      addOneVolAccess(UO);
+  }
+  return !hasMultipleVolAccesses();
+}
+
 bool VolatileAccessCollector::VisitRecordDecl(RecordDecl *RD)
 {
   if (ConsumerInstance->VisitedRecords.count(
@@ -281,6 +305,15 @@ bool VolatileAccessCollector::VisitDeclRefExpr(DeclRefExpr *DRE)
   if (!VD)
     return true;
   return ConsumerInstance->handleOneQualType(CurrFD, VD->getType());
+}
+
+bool VolatileAccessCollector::VisitUnaryOperator(UnaryOperator *UO)
+{
+  UnaryOperator::Opcode Op = UO->getOpcode();
+  if ((Op == UO_AddrOf) || (Op == UO_Deref)) {
+    return ConsumerInstance->handleOneQualType(CurrFD, UO->getType());
+  }
+  return true;
 }
 
 bool VolatileAccessCollector::VisitMemberExpr(MemberExpr *ME)
@@ -449,9 +482,11 @@ bool VolatileReorderChecker::hasVolatileQual(const QualType &QT)
   }
 
   const Type *Ty = QT.getTypePtr();
+#if 0
   if (Ty->isPointerType()) {
     return hasVolatileQual(Ty->getPointeeType());
   }
+#endif
   if (Ty->isArrayType()) {
     const ArrayType *ATy = Context->getAsArrayType(QT);
     return hasVolatileQual(ATy->getElementType());
