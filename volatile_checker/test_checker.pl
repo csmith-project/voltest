@@ -38,7 +38,6 @@ sub do_one_csmith_test($$) {
   my $res = runit("RunSafely.sh 10 1 /dev/null $n.run.out $n.exe");
   if ($res == 137) {
     print "iteration [$n] timeout\n";
-    goto out;
   }
   elsif ($res != 0) {
     die "failed to run exe!";
