@@ -5,6 +5,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/DenseMap.h"
 #include "Checker.h"
 
 namespace clang {
@@ -29,7 +30,8 @@ friend class ExpressionVolatileAccessVisitor;
 public:
 
   VolatileReorderChecker(const char *CheckerName, const char *Desc)
-    : Checker(CheckerName, Desc)
+    : Checker(CheckerName, Desc),
+      OffensiveExpr(NULL)
   { }
 
   ~VolatileReorderChecker();
@@ -40,6 +42,8 @@ private:
 
   typedef llvm::SmallPtrSet<const clang::RecordDecl *, 10> RecordDeclSet;
 
+  typedef llvm::DenseMap<const clang::FunctionDecl *, std::string> FunctionVolatileMap;
+
   typedef llvm::SmallVector<const clang::Expr *, 5> ExprVector;
 
   virtual void Initialize(clang::ASTContext &context);
@@ -48,20 +52,24 @@ private:
 
   virtual bool HandleTopLevelDecl(clang::DeclGroupRef D);
 
-  const clang::Expr *OffensiveExpr;
-
-  ExprVector VolAccesses;
-
   void printAllFuncsWithVols();
 
   bool handleOneQualType(const clang::FunctionDecl *CurrFD,
+                         const clang::Expr *E,
                          const clang::QualType &QT);
 
   bool hasVolatileQual(const clang::QualType &QT);
 
   void updateFuncsWithVols(const clang::CallGraph &CG);
 
+  void addOneVolExprStr(const clang::FunctionDecl *CurrFD, 
+                        const clang::Expr *E);
+
   bool visitCallGraphNode(const clang::CallGraphNode *Node);
+
+  FunctionVolatileMap FuncVol;
+
+  ExprVector VolAccesses;
 
   FunctionSet FuncsWithVols;
 
@@ -70,6 +78,8 @@ private:
   RecordDeclSet RecordsWithVols;
 
   RecordDeclSet VisitedRecords;
+
+  const clang::Expr *OffensiveExpr;
 
   // Unimplemented
   VolatileReorderChecker();

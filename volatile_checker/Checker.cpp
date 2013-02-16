@@ -46,6 +46,7 @@ void Checker::splitString(const std::string &Str, char Delim,
 
 void Checker::getExprLineNumStr(const Expr *E, std::string &ES)
 {
+  ES = "";
   SourceRange ExprRange = E->getSourceRange();
   CheckerAssert(ExprRange.isValid() && "Invalid ExprRange!");
   unsigned Ln = 

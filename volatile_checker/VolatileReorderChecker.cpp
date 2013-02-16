@@ -324,14 +324,14 @@ bool VolatileAccessCollector::VisitDeclRefExpr(DeclRefExpr *DRE)
   const VarDecl *VD = dyn_cast<VarDecl>(DRE->getDecl());
   if (!VD)
     return true;
-  return ConsumerInstance->handleOneQualType(CurrFD, VD->getType());
+  return ConsumerInstance->handleOneQualType(CurrFD, DRE, VD->getType());
 }
 
 bool VolatileAccessCollector::VisitUnaryOperator(UnaryOperator *UO)
 {
   UnaryOperator::Opcode Op = UO->getOpcode();
   if ((Op == UO_AddrOf) || (Op == UO_Deref)) {
-    return ConsumerInstance->handleOneQualType(CurrFD, UO->getType());
+    return ConsumerInstance->handleOneQualType(CurrFD, UO, UO->getType());
   }
   return true;
 }
@@ -342,6 +342,7 @@ bool VolatileAccessCollector::VisitMemberExpr(MemberExpr *ME)
     if (ME->getType().isVolatileQualified()) {
       CheckerAssert(CurrFD && "NULL CurrFD!");
       ConsumerInstance->FuncsWithVols.insert(CurrFD);
+      ConsumerInstance->addOneVolExprStr(CurrFD, ME);
       return false;
     }
     else {
@@ -354,12 +355,12 @@ bool VolatileAccessCollector::VisitMemberExpr(MemberExpr *ME)
     return true;
 
   IsFromMemberExpr = true;
-  return ConsumerInstance->handleOneQualType(CurrFD, D->getType());
+  return ConsumerInstance->handleOneQualType(CurrFD, ME, D->getType());
 }
 
 bool VolatileAccessCollector::VisitExplicitCastExpr(ExplicitCastExpr *CE)
 {
-  return ConsumerInstance->handleOneQualType(CurrFD, 
+  return ConsumerInstance->handleOneQualType(CurrFD, CE,
            CE->getTypeAsWritten());
 }
 
@@ -472,7 +473,9 @@ bool VolatileReorderChecker::visitCallGraphNode(const CallGraphNode *Node)
     hasVolAccess = visitCallGraphNode(*I) || hasVolAccess;
   }
   if (FD && hasVolAccess && !VolFunc) {
-    FuncsWithVols.insert(FD->getCanonicalDecl());
+    const FunctionDecl *CanonicalFD = FD->getCanonicalDecl();
+    FuncsWithVols.insert(CanonicalFD);
+    FuncVol[CanonicalFD] = "callee(s) has volatile accesses";
   }
 
   return (VolFunc || hasVolAccess);
@@ -484,12 +487,27 @@ void VolatileReorderChecker::updateFuncsWithVols(const CallGraph &CG)
   visitCallGraphNode(Root);
 }
 
+void VolatileReorderChecker::addOneVolExprStr(const FunctionDecl *CurrFD,
+                                              const Expr *E)
+{
+  std::string VolStr("");
+  std::string ES;
+  getExprString(E, ES);
+  VolStr += ES;
+  VolStr += " at line ";
+  getExprLineNumStr(E, ES);
+  VolStr += ES;
+  FuncVol[CurrFD] = VolStr;
+}
+
 bool VolatileReorderChecker::handleOneQualType(const FunctionDecl *CurrFD,
+                                               const Expr *E,
                                                const QualType &QT)
 {
   CheckerAssert(CurrFD && "NULL CurrFD!");
   if (hasVolatileQual(QT)) {
     FuncsWithVols.insert(CurrFD);
+    addOneVolExprStr(CurrFD, E);
     return false;
   }
   return true;
@@ -526,7 +544,8 @@ void VolatileReorderChecker::printAllFuncsWithVols()
   llvm::outs() << "Functions that have volatile accesses: \n";
   for (FunctionSet::iterator I = FuncsWithVols.begin(), E = FuncsWithVols.end();
        I != E; ++I) {
-    llvm::outs() << "  " << (*I)->getNameAsString() << "\n";
+    llvm::outs() << "  " << (*I)->getNameAsString() << " : ";
+    llvm::outs() << "volatile access to " << FuncVol[(*I)] << "\n";
   }
   llvm::outs() << "\n";
 }
