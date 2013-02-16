@@ -76,8 +76,8 @@ sub test_against_csmith($) {
   print "All $iteration tests passed!\n";
 }
 
-sub test_one_dir($$) {
-  my ($dir, $checker) = @_;
+sub test_one_dir($$$) {
+  my ($dir, $checker, $regenerate) = @_;
 
   my @test_files = glob("*.c");
   for (my $i = 0; $i < @test_files; $i++) {
@@ -91,6 +91,12 @@ sub test_one_dir($$) {
       next;
     }
 
+    if ($regenerate) {
+      runit("../volatile_checker --checker=$checker $test > $out 2>&1");
+      print "done\n";
+      next;
+    }
+ 
     my $new_out = "$out.new";
     runit("../volatile_checker --checker=$checker $test > $new_out 2>&1");
     if (runit("diff $new_out $out")) {
@@ -104,14 +110,24 @@ sub test_one_dir($$) {
   }
 }
 
-sub do_unit_test() {
-  print "Start testing...\n";
+sub do_unit_test($) {
+  my ($regenerate) = @_;
+
+  my $msg;
+  if ($regenerate) {
+    $msg = "regenerating";
+  }
+  else {
+    $msg = "testing";
+  }
+  print "Start $msg...\n";
+
   my $cwd = cwd();
   foreach my $dir (keys %tests_dir) {
-    print "[*]testing dir $dir\n";
+    print "[*]$msg dir $dir\n";
     chdir $dir or die;
     my $checker = $tests_dir{$dir};
-    test_one_dir($dir, $checker);
+    test_one_dir($dir, $checker, $regenerate);
     chdir $cwd or die;
   }
 
@@ -134,6 +150,7 @@ Usage: test_checker.pl
   --with-csmith: test checkers agains csmith with --strict-volatile-rules
   --iteration: only work with --with-csmith option, determine the number of testing iteration (default: 100)
   --save-temp: only work with --with-csmith option, save temp files.
+  --regenerate-test-output: re-generate test output
 ';
 
 sub die_with_help($) {
@@ -148,6 +165,7 @@ sub main() {
   my $opt;
   my @unused = ();
   my $with_csmith = 0;
+  my $regenerate = 0;
   my $iteration = 100;
 
   while(defined ($opt = shift @ARGV)) {
@@ -165,6 +183,9 @@ sub main() {
       }
       elsif ($1 eq "save-temp") {
         $SAVE_TEMP = 1;
+      }
+      elsif ($1 eq "regenerate-test-output") {
+        $regenerate = 1;
       }
       elsif ($1 eq "help") {
         print $help_msg;
@@ -184,7 +205,7 @@ sub main() {
     test_against_csmith($iteration);
   }
   else {
-    do_unit_test();
+    do_unit_test($regenerate);
   }
 }
 
