@@ -1,0 +1,8 @@
+Error: Offensive Expr is at line 9: g.f1 + g.f1
+  multiple volatile accesses:
+  g.f1
+  g.f1
+
+Functions that have volatile accesses: 
+  foo : volatile access to g.f1 at line 9
+

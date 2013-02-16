@@ -4,9 +4,9 @@ Error: Offensive Expr is at line 36: f5(g1, f4())
   f4()
 
 Functions that have volatile accesses: 
-  f1
-  f2
-  f3
-  f4
-  f6
+  f1 : volatile access to g1 at line 6
+  f2 : volatile access to g1 at line 13
+  f3 : volatile access to g1 at line 19
+  f4 : volatile access to g1 at line 26
+  f6 : volatile access to g1 at line 41
 

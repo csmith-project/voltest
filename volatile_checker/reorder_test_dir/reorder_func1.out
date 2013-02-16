@@ -1,8 +1,8 @@
 Functions that have volatile accesses: 
-  f1
-  f2
-  f3
-  f6
-  main
+  f1 : volatile access to g1 at line 5
+  f2 : volatile access to callee(s) has volatile accesses
+  f3 : volatile access to callee(s) has volatile accesses
+  f6 : volatile access to callee(s) has volatile accesses
+  main : volatile access to callee(s) has volatile accesses
 
 Succeeded

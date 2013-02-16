@@ -1,5 +1,5 @@
 Functions that have volatile accesses: 
-  f7
-  f9
+  f7 : volatile access to g7.a1 at line 18
+  f9 : volatile access to g8.a1 at line 30
 
 Succeeded

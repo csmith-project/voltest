@@ -4,5 +4,5 @@ Error: Offensive Expr is at line 4: *g1 + *g1
   g1
 
 Functions that have volatile accesses: 
-  foo
+  foo : volatile access to *g1 at line 4
 
