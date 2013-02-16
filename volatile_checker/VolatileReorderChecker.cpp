@@ -26,7 +26,8 @@ public:
                           const FunctionDecl *FD)
     : ConsumerInstance(Instance),
       CurrFD(FD),
-      IsFromMemberExpr(false)
+      IsFromMemberExpr(false),
+      IsFromAddrTaken(false)
   { }
 
   ~VolatileAccessCollector() { }
@@ -35,11 +36,11 @@ public:
 
   bool VisitMemberExpr(MemberExpr *ME);
 
+  bool VisitUnaryOperator(UnaryOperator *UO);
+
   bool VisitRecordDecl(RecordDecl *RD);
 
   bool VisitExplicitCastExpr(ExplicitCastExpr *CE);
-
-  bool VisitUnaryOperator(UnaryOperator *UO);
 
 private:
   VolatileReorderChecker *ConsumerInstance;
@@ -47,6 +48,8 @@ private:
   const FunctionDecl *CurrFD; 
 
   bool IsFromMemberExpr;
+
+  bool IsFromAddrTaken;
 };
 
 class VolatileAccessVisitor : public 
@@ -319,21 +322,16 @@ bool VolatileAccessCollector::VisitDeclRefExpr(DeclRefExpr *DRE)
     IsFromMemberExpr = false;
     return true;
   }
+  if (IsFromAddrTaken) {
+    IsFromAddrTaken = false;
+    return true;
+  }
 
   IsFromMemberExpr = false;
   const VarDecl *VD = dyn_cast<VarDecl>(DRE->getDecl());
   if (!VD)
     return true;
   return ConsumerInstance->handleOneQualType(CurrFD, DRE, VD->getType());
-}
-
-bool VolatileAccessCollector::VisitUnaryOperator(UnaryOperator *UO)
-{
-  UnaryOperator::Opcode Op = UO->getOpcode();
-  if ((Op == UO_AddrOf) || (Op == UO_Deref)) {
-    return ConsumerInstance->handleOneQualType(CurrFD, UO, UO->getType());
-  }
-  return true;
 }
 
 bool VolatileAccessCollector::VisitMemberExpr(MemberExpr *ME)
@@ -356,6 +354,27 @@ bool VolatileAccessCollector::VisitMemberExpr(MemberExpr *ME)
 
   IsFromMemberExpr = true;
   return ConsumerInstance->handleOneQualType(CurrFD, ME, D->getType());
+}
+
+bool VolatileAccessCollector::VisitUnaryOperator(UnaryOperator *UO)
+{
+  UnaryOperator::Opcode Op = UO->getOpcode();
+  if (Op == UO_Deref) {
+    return ConsumerInstance->handleOneQualType(CurrFD, UO, UO->getType());
+  }
+  if (Op != UO_AddrOf)
+    return true;
+
+  Expr *E = UO->getSubExpr()->IgnoreParenCasts();
+
+  IsFromAddrTaken = true;
+  if (E->getType().isVolatileQualified()) {
+    CheckerAssert(CurrFD && "NULL CurrFD!");
+    ConsumerInstance->FuncsWithVols.insert(CurrFD);
+    ConsumerInstance->addOneVolExprStr(CurrFD, E);
+    return false;
+  }
+  return true;
 }
 
 bool VolatileAccessCollector::VisitExplicitCastExpr(ExplicitCastExpr *CE)
