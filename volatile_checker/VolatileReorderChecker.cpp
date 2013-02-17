@@ -204,6 +204,13 @@ bool ExpressionVolatileAccessVisitor::VisitCallExpr(CallExpr *CE)
     }
   }
 
+  // handle cases like:
+  // volatile int g;
+  // int foo(int p) {
+  //  return g;
+  // }
+  // void bar(void) { foo(foo(1)); }
+  // in this case, foo(foo(1)) only have one volatile accesses between two sequence points 
   for (int I = V.getNumVolAccesses(); I > 0; --I) {
     NumVolAccesses--;
   }
@@ -213,9 +220,16 @@ bool ExpressionVolatileAccessVisitor::VisitCallExpr(CallExpr *CE)
   // conservatively increase NumVolAccesses...
   if (!FD || ConsumerInstance->FuncsWithVols.count(FD->getCanonicalDecl())) {
     NumVolAccesses++;
-    addOneVolAccess(CE);
+    if (hasMultipleVolAccesses()) {
+      // when VolAccesses.size() >= NumVolAccesses, 
+      // we are on the way back from recursive call when dealing with foo(foo(1))
+      // so skip it
+      if (static_cast<int>(VolAccesses.size()) < NumVolAccesses)
+        addOneVolAccess(CE);
+      return false;
+    }
   }
-  return !hasMultipleVolAccesses();
+  return true;
 }
 
 bool ExpressionVolatileAccessVisitor::VisitBinaryOperator(BinaryOperator *BO)
@@ -398,6 +412,7 @@ bool VolatileAccessVisitor::VisitExpr(Expr *E)
     CheckerAssert((V.getNumVolAccesses() == 
                      static_cast<int>(ConsumerInstance->VolAccesses.size())) &&
                   "Unmatched Vol Accesses!");
+
     return false;
   }
   else {
