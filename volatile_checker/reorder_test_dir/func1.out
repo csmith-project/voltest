@@ -1,7 +1,7 @@
 Error: Offensive Expr is at line 10: foo(g2 == foo(foo(1)))
   multiple volatile accesses:
   g2
-  foo(1)
+  foo(foo(1))
 
 Functions that have volatile accesses: 
   foo : volatile access to g1 at line 5

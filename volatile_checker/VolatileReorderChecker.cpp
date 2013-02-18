@@ -228,6 +228,7 @@ bool ExpressionVolatileAccessVisitor::VisitCallExpr(CallExpr *CE)
         addOneVolAccess(CE);
       return false;
     }
+    addOneVolAccess(CE);
   }
   return true;
 }
@@ -412,7 +413,6 @@ bool VolatileAccessVisitor::VisitExpr(Expr *E)
     CheckerAssert((V.getNumVolAccesses() == 
                      static_cast<int>(ConsumerInstance->VolAccesses.size())) &&
                   "Unmatched Vol Accesses!");
-
     return false;
   }
   else {
