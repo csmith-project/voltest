@@ -1,0 +1,18 @@
+Error: Offensive Expr is at line 2607: l_2694.f1 = (safe_rshift_func_uint16_t_u_s(((l_2712 , ((safe_rshift_func_int16_t_s_s((((****g_649) = l_2705[2][0][2]) < (safe_mod_func_int8_t_s_s(0x5DL, (safe_mul_func_int16_t_s_s((((g_2444 , (!(*l_2557))) > (l_2719 != (**g_2518))) , l_2611[6][2][0]), (0x3E641E715E7A4B88LL >= 0xB6F7C837F71C8953LL)))))), (*g_690))) ^ l_2712)) != (*g_541)), (**g_689)))
+  multiple volatile accesses:
+  g_541
+  *g_689
+
+Functions that have volatile accesses: 
+  func_1 : volatile access to g_11 at line 2470
+  func_17 : volatile access to g_34 at line 2688
+  func_40 : volatile access to *g_689 at line 2881
+  func_46 : volatile access to g_1925 at line 3608
+  func_50 : volatile access to g_297 at line 3748
+  func_58 : volatile access to g_11 at line 3885
+  func_63 : volatile access to g_541 at line 4314
+  func_69 : volatile access to g_352 at line 4344
+  func_77 : volatile access to g_34 at line 4393
+  func_86 : volatile access to g_34 at line 4485
+  main : volatile access to g_11 at line 4603
+
