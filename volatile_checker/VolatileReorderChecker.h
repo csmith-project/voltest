@@ -16,22 +16,26 @@ namespace clang {
   class RecordDecl;
   class CallGraph;
   class CallGraphNode;
+  class Stmt;
 }
 
 class VolatileAccessCollector;
 class VolatileAccessVisitor;
+class VolatileAccessStmtVisitor;
 class ExpressionVolatileAccessVisitor;
 
 class VolatileReorderChecker : public Checker {
 friend class VolatileAccessCollector;
 friend class VolatileAccessVisitor;
+friend class VolatileAccessStmtVisitor;
 friend class ExpressionVolatileAccessVisitor;
 
 public:
 
   VolatileReorderChecker(const char *CheckerName, const char *Desc)
     : Checker(CheckerName, Desc),
-      OffensiveExpr(NULL)
+      OffensiveExpr(NULL),
+      MultipleVolAccesses(false)
   { }
 
   ~VolatileReorderChecker();
@@ -53,6 +57,10 @@ private:
   virtual bool HandleTopLevelDecl(clang::DeclGroupRef D);
 
   void printAllFuncsWithVols();
+
+  bool handleOneStmt(clang::Stmt *S);
+
+  bool handleOneExpr(clang::Expr *E);
 
   bool handleOneQualType(const clang::FunctionDecl *CurrFD,
                          const clang::Expr *E,
@@ -80,6 +88,8 @@ private:
   RecordDeclSet VisitedRecords;
 
   const clang::Expr *OffensiveExpr;
+
+  bool MultipleVolAccesses;
 
   // Unimplemented
   VolatileReorderChecker();

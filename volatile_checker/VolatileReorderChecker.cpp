@@ -52,16 +52,17 @@ private:
   bool IsFromAddrTaken;
 };
 
-class VolatileAccessVisitor : public 
-  RecursiveASTVisitor<VolatileAccessVisitor> {
+// designated for single stmt
+class VolatileAccessStmtVisitor : public 
+  RecursiveASTVisitor<VolatileAccessStmtVisitor> {
 
 public:
-  explicit VolatileAccessVisitor(VolatileReorderChecker *Instance)
+  explicit VolatileAccessStmtVisitor(VolatileReorderChecker *Instance)
     : ConsumerInstance(Instance),
       MultipleVolAccesses(false)
   { }
 
-  ~VolatileAccessVisitor() { }
+  ~VolatileAccessStmtVisitor() { }
 
   bool VisitExpr(Expr *E);
 
@@ -71,6 +72,45 @@ private:
   VolatileReorderChecker *ConsumerInstance;
 
   bool MultipleVolAccesses;
+};
+
+class VolatileAccessVisitor : public 
+  RecursiveASTVisitor<VolatileAccessVisitor> {
+
+public:
+  explicit VolatileAccessVisitor(VolatileReorderChecker *Instance)
+    : ConsumerInstance(Instance)
+  { }
+
+  ~VolatileAccessVisitor() { }
+
+  bool VisitIfStmt(IfStmt *IS);
+
+  bool VisitForStmt(ForStmt *FS);
+
+  bool VisitWhileStmt(WhileStmt *WS);
+
+  bool VisitDoStmt(DoStmt *DS);
+
+  bool VisitSwitchStmt(SwitchStmt *SS);
+
+  bool VisitCaseStmt(CaseStmt *CS);
+
+  bool VisitDefaultStmt(DefaultStmt *DS);
+
+  bool VisitReturnStmt(ReturnStmt *RS);
+
+  bool VisitDeclStmt(DeclStmt *DS);
+
+  bool VisitCompoundStmt(CompoundStmt *CS);
+
+#if 0
+  bool VisitExpr(Expr *E);
+#endif
+
+private:
+  VolatileReorderChecker *ConsumerInstance;
+
 };
 
 class ExpressionVolatileAccessVisitor : public 
@@ -399,6 +439,112 @@ bool VolatileAccessCollector::VisitExplicitCastExpr(ExplicitCastExpr *CE)
            CE->getTypeAsWritten());
 }
 
+bool VolatileAccessStmtVisitor::VisitExpr(Expr *E)
+{
+  if (dyn_cast<InitListExpr>(E)) {
+    return true;
+  }
+  MultipleVolAccesses = ConsumerInstance->handleOneExpr(E);
+  return !MultipleVolAccesses;
+}
+
+bool VolatileAccessVisitor::VisitIfStmt(IfStmt *IS)
+{
+  if (ConsumerInstance->handleOneExpr(IS->getCond()))
+    return false;
+  if (ConsumerInstance->handleOneStmt(IS->getThen()))
+    return false;
+  if (ConsumerInstance->handleOneStmt(IS->getElse()))
+    return false;
+  return true;
+}
+
+bool VolatileAccessVisitor::VisitForStmt(ForStmt *FS)
+{
+  if (ConsumerInstance->handleOneStmt(FS->getInit()))
+    return false;
+
+  if (ConsumerInstance->handleOneExpr(FS->getCond()))
+    return false;
+
+  if (ConsumerInstance->handleOneExpr(FS->getInc()))
+    return false;
+
+  if (ConsumerInstance->handleOneStmt(FS->getBody()))
+    return false;
+
+  return true;
+}
+
+bool VolatileAccessVisitor::VisitWhileStmt(WhileStmt *WS)
+{
+  if (ConsumerInstance->handleOneExpr(WS->getCond()))
+    return false;
+  if (ConsumerInstance->handleOneStmt(WS->getBody()))
+    return false;
+
+  return true;
+}
+
+bool VolatileAccessVisitor::VisitDoStmt(DoStmt *DS)
+{
+  if (ConsumerInstance->handleOneExpr(DS->getCond()))
+    return false;
+  if (ConsumerInstance->handleOneStmt(DS->getBody()))
+    return false;
+
+  return true;
+}
+
+bool VolatileAccessVisitor::VisitSwitchStmt(SwitchStmt *SS)
+{
+  if (ConsumerInstance->handleOneExpr(SS->getCond()))
+    return false;
+  if (ConsumerInstance->handleOneStmt(SS->getBody()))
+    return false;
+
+  return true;
+}
+
+bool VolatileAccessVisitor::VisitCaseStmt(CaseStmt *CS)
+{
+  if (ConsumerInstance->handleOneStmt(CS->getSubStmt()))
+    return false;
+  return true;
+}
+
+bool VolatileAccessVisitor::VisitDefaultStmt(DefaultStmt *DS)
+{
+  if (ConsumerInstance->handleOneStmt(DS->getSubStmt()))
+    return false;
+  return true;
+}
+
+bool VolatileAccessVisitor::VisitReturnStmt(ReturnStmt *RS)
+{
+  if (ConsumerInstance->handleOneExpr(RS->getRetValue()))
+    return false;
+  return true;
+}
+
+bool VolatileAccessVisitor::VisitDeclStmt(DeclStmt *DS)
+{
+  if (ConsumerInstance->handleOneStmt(DS))
+    return false;
+  return true;
+}
+
+bool VolatileAccessVisitor::VisitCompoundStmt(CompoundStmt *CS)
+{
+  for (CompoundStmt::body_iterator I = CS->body_begin(),
+       E = CS->body_end(); I != E; ++I) {
+    if (ConsumerInstance->handleOneExpr(dyn_cast<Expr>(*I)))
+      return false;
+  }
+  return true;
+}
+
+#if 0
 bool VolatileAccessVisitor::VisitExpr(Expr *E)
 {
   if (dyn_cast<InitListExpr>(E)) {
@@ -420,6 +566,7 @@ bool VolatileAccessVisitor::VisitExpr(Expr *E)
     return true;
   }
 }
+#endif
 
 void VolatileReorderChecker::Initialize(ASTContext &context) 
 {
@@ -458,7 +605,7 @@ void VolatileReorderChecker::HandleTranslationUnit(ASTContext &Ctx)
 
   VolatileAccessVisitor AccessVisitor(this);
   AccessVisitor.TraverseDecl(Ctx.getTranslationUnitDecl());
-  Success = !AccessVisitor.hasMultipleVolAccesses();
+  Success = !MultipleVolAccesses;
   if (!Success) {
     CheckerAssert((VolAccesses.size() > 1) && 
                   "size of VolAccesses must be greater than 1!");
@@ -488,6 +635,37 @@ void VolatileReorderChecker::HandleTranslationUnit(ASTContext &Ctx)
       Ctx.getDiagnostics().hasFatalErrorOccurred()) {
     CheckerAssert(0 && "Fatal error during checing!");
   }
+}
+
+bool VolatileReorderChecker::handleOneStmt(Stmt *S)
+{
+  if (!S)
+    return false;
+  if (dyn_cast<CompoundStmt>(S))
+    return false;
+
+  VolatileAccessStmtVisitor V(this);
+  V.TraverseStmt(S);
+  return V.hasMultipleVolAccesses();
+}
+
+bool VolatileReorderChecker::handleOneExpr(Expr *E)
+{
+  if (!E)
+    return false;
+
+  ExpressionVolatileAccessVisitor V(this);
+  V.TraverseStmt(E);
+  if (!V.hasMultipleVolAccesses())
+    return false;
+
+    MultipleVolAccesses = true;
+    OffensiveExpr = E;
+    V.getVolAccesses(VolAccesses);
+    CheckerAssert((V.getNumVolAccesses() == 
+                     static_cast<int>(VolAccesses.size())) &&
+                  "Unmatched Vol Accesses!");
+  return true;
 }
 
 bool VolatileReorderChecker::visitCallGraphNode(const CallGraphNode *Node)
