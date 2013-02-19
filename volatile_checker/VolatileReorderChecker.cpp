@@ -194,7 +194,6 @@ bool ExpressionVolatileAccessVisitor::VisitExplicitCastExpr(ExplicitCastExpr *CE
 bool ExpressionVolatileAccessVisitor::VisitCallExpr(CallExpr *CE)
 {
   ExpressionVolatileAccessVisitor V(ConsumerInstance);
-  int NestedNumAccesses = 0;
   for (CallExpr::arg_iterator I = CE->arg_begin(), E = CE->arg_end();
        I != E; ++I) {
     V.TraverseStmt(*I);
@@ -203,7 +202,6 @@ bool ExpressionVolatileAccessVisitor::VisitCallExpr(CallExpr *CE)
       V.getVolAccesses(VolAccesses);
       return false;
     }
-    NestedNumAccesses += V.getNumVolAccesses();
   }
 
   // handle cases like:
@@ -213,7 +211,7 @@ bool ExpressionVolatileAccessVisitor::VisitCallExpr(CallExpr *CE)
   // }
   // void bar(void) { foo(foo(1)); }
   // in this case, foo(foo(1)) only have one volatile accesses between two sequence points 
-  for (int I = NestedNumAccesses; I > 0; --I) {
+  for (int I = V.getNumVolAccesses(); I > 0; --I) {
     NumVolAccesses--;
   }
 
