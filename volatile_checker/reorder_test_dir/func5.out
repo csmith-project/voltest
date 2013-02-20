@@ -1,0 +1,8 @@
+Error: Offensive Expr is at line 10: foo(g + foo(g))
+  multiple volatile accesses:
+  g
+  g
+
+Functions that have volatile accesses: 
+  bar : volatile access to g at line 10
+
