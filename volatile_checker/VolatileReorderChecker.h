@@ -50,6 +50,8 @@ private:
 
   typedef llvm::SmallVector<const clang::Expr *, 5> ExprVector;
 
+  typedef llvm::DenseMap<const clang::Expr *, int> ExprMap;
+
   virtual void Initialize(clang::ASTContext &context);
 
   virtual void HandleTranslationUnit(clang::ASTContext &Ctx);
@@ -86,6 +88,8 @@ private:
   RecordDeclSet RecordsWithVols;
 
   RecordDeclSet VisitedRecords;
+
+  ExprMap VisitedExprs;
 
   const clang::Expr *OffensiveExpr;
 

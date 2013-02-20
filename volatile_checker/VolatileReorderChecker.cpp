@@ -17,6 +17,7 @@ static RegisterChecker<VolatileReorderChecker>
          C("volatile-reorder", DescriptionMsg);
 
 typedef llvm::SmallVector<const Expr *, 5> ExprVector;
+typedef llvm::DenseMap<const Expr *, int> ExprMap;
 
 class VolatileAccessCollector : public 
   RecursiveASTVisitor<VolatileAccessCollector> {
@@ -142,6 +143,8 @@ public:
 
   int getNumVolAccesses() { return NumVolAccesses; }
 
+  void setNumVolAccesses(int Num) { NumVolAccesses = Num; }
+
   void getVolAccesses(ExprVector &Accesses);
 
   void addOneVolAccess(const Expr *E);
@@ -234,14 +237,21 @@ bool ExpressionVolatileAccessVisitor::VisitExplicitCastExpr(ExplicitCastExpr *CE
 bool ExpressionVolatileAccessVisitor::VisitCallExpr(CallExpr *CE)
 {
   ExpressionVolatileAccessVisitor V(ConsumerInstance);
-  for (CallExpr::arg_iterator I = CE->arg_begin(), E = CE->arg_end();
-       I != E; ++I) {
-    V.TraverseStmt(*I);
-    if (V.hasMultipleVolAccesses()) {
-      NumVolAccesses = V.getNumVolAccesses(); 
-      V.getVolAccesses(VolAccesses);
-      return false;
+  ExprMap::iterator EI = ConsumerInstance->VisitedExprs.find(CE);
+  if (EI == ConsumerInstance->VisitedExprs.end()) {
+    for (CallExpr::arg_iterator I = CE->arg_begin(), E = CE->arg_end();
+         I != E; ++I) {
+      V.TraverseStmt(*I);
+      if (V.hasMultipleVolAccesses()) {
+        NumVolAccesses = V.getNumVolAccesses(); 
+        V.getVolAccesses(VolAccesses);
+        return false;
+      }
     }
+    ConsumerInstance->VisitedExprs[CE] = V.getNumVolAccesses();
+  }
+  else {
+    V.setNumVolAccesses((*EI).second);
   }
 
   // handle cases like:
@@ -258,17 +268,17 @@ bool ExpressionVolatileAccessVisitor::VisitCallExpr(CallExpr *CE)
   const FunctionDecl *FD = CE->getDirectCallee();
   // FIXME: not precise, for example, not considering function pointers
   // conservatively increase NumVolAccesses...
-  if (!FD || ConsumerInstance->FuncsWithVols.count(FD->getCanonicalDecl())) {
+  if ((!FD || ConsumerInstance->FuncsWithVols.count(FD->getCanonicalDecl())) ||
+      (V.getNumVolAccesses() > 0)) {
     NumVolAccesses++;
+    // when VolAccesses.size() >= NumVolAccesses, 
+    // we are on the way back from recursive call when dealing with foo(foo(1))
+    // so skip it
+    if (static_cast<int>(VolAccesses.size()) < NumVolAccesses)
+      addOneVolAccess(CE);
     if (hasMultipleVolAccesses()) {
-      // when VolAccesses.size() >= NumVolAccesses, 
-      // we are on the way back from recursive call when dealing with foo(foo(1))
-      // so skip it
-      if (static_cast<int>(VolAccesses.size()) < NumVolAccesses)
-        addOneVolAccess(CE);
       return false;
     }
-    addOneVolAccess(CE);
   }
   return true;
 }
@@ -654,7 +664,9 @@ bool VolatileReorderChecker::handleOneExpr(Expr *E)
   if (!E)
     return false;
 
+  VisitedExprs.clear();
   ExpressionVolatileAccessVisitor V(this);
+
   V.TraverseStmt(E);
   if (!V.hasMultipleVolAccesses())
     return false;
