@@ -4,7 +4,6 @@ Functions that have volatile accesses:
   func_12 : volatile access to g_1310 at line 4844
   func_15 : volatile access to *g_189 at line 4959
   func_20 : volatile access to *g_582 at line 5171
-  func_64 : volatile access to g_190 at line 6553
   main : volatile access to g_2 at line 6676
 
 Succeeded

@@ -431,13 +431,25 @@ bool VolatileAccessCollector::VisitUnaryOperator(UnaryOperator *UO)
   if (Op != UO_AddrOf)
     return true;
 
-  Expr *E = UO->getSubExpr()->IgnoreParenCasts();
+  // Expr *E = UO->getSubExpr()->IgnoreParenCasts();
 
   IsFromAddrTaken = true;
-  if (E->getType().isVolatileQualified()) {
+
+  // ISSUE: in the case below, is the definition of local var l counted as volatile access?
+  // volatile int g;
+  // void foo(void) {
+  //   volatile int * volatile l = &g;
+  // }
+  // If so, we will need to check the type of each declared local var with any initializer
+  // using VarDecl
+  
+  // check the type of UO rather than its SubExpr
+  // for example: volatile int g;
+  // altough g is volatile, but &g is not.
+  if (UO->getType().isVolatileQualified()) {
     CheckerAssert(CurrFD && "NULL CurrFD!");
     ConsumerInstance->FuncsWithVols.insert(CurrFD);
-    ConsumerInstance->addOneVolExprStr(CurrFD, E);
+    ConsumerInstance->addOneVolExprStr(CurrFD, UO);
     return false;
   }
   return true;
