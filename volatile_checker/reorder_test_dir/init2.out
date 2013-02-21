@@ -1,0 +1,4 @@
+Functions that have volatile accesses: 
+  bar : volatile access to g2 at line 15
+
+Succeeded

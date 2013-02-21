@@ -89,7 +89,9 @@ private:
 
   RecordDeclSet VisitedRecords;
 
-  ExprMap VisitedExprs;
+  ExprMap VisitedCallExprs;
+
+  ExprMap VisitedBinaryExprs;
 
   const clang::Expr *OffensiveExpr;
 

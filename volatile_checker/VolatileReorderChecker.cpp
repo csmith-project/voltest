@@ -237,8 +237,8 @@ bool ExpressionVolatileAccessVisitor::VisitExplicitCastExpr(ExplicitCastExpr *CE
 bool ExpressionVolatileAccessVisitor::VisitCallExpr(CallExpr *CE)
 {
   ExpressionVolatileAccessVisitor V(ConsumerInstance);
-  ExprMap::iterator EI = ConsumerInstance->VisitedExprs.find(CE);
-  if (EI == ConsumerInstance->VisitedExprs.end()) {
+  ExprMap::iterator EI = ConsumerInstance->VisitedCallExprs.find(CE);
+  if (EI == ConsumerInstance->VisitedCallExprs.end()) {
     for (CallExpr::arg_iterator I = CE->arg_begin(), E = CE->arg_end();
          I != E; ++I) {
       V.TraverseStmt(*I);
@@ -248,7 +248,7 @@ bool ExpressionVolatileAccessVisitor::VisitCallExpr(CallExpr *CE)
         return false;
       }
     }
-    ConsumerInstance->VisitedExprs[CE] = V.getNumVolAccesses();
+    ConsumerInstance->VisitedCallExprs[CE] = V.getNumVolAccesses();
   }
   else {
     V.setNumVolAccesses((*EI).second);
@@ -291,16 +291,16 @@ bool ExpressionVolatileAccessVisitor::VisitBinaryOperator(BinaryOperator *BO)
       (Op == BO_LOr)) {
     Expr *E = BO->getLHS();
     ExpressionVolatileAccessVisitor V(ConsumerInstance);
-    ExprMap::iterator EI = ConsumerInstance->VisitedExprs.find(E);
+    ExprMap::iterator EI = ConsumerInstance->VisitedBinaryExprs.find(E);
 
-    if (EI == ConsumerInstance->VisitedExprs.end()) {
+    if (EI == ConsumerInstance->VisitedBinaryExprs.end()) {
       V.TraverseStmt(E);
       if (V.hasMultipleVolAccesses()) {
         NumVolAccesses = V.getNumVolAccesses(); 
         V.getVolAccesses(VolAccesses);
         return false;
       }
-      ConsumerInstance->VisitedExprs[E] = V.getNumVolAccesses();
+      ConsumerInstance->VisitedBinaryExprs[E] = V.getNumVolAccesses();
     }
     else {
       V.setNumVolAccesses((*EI).second);
@@ -421,6 +421,11 @@ bool VolatileAccessCollector::VisitMemberExpr(MemberExpr *ME)
     else {
       return true;
     }
+  }
+
+  // rule out &s.f1
+  if (IsFromAddrTaken) {
+    return true;
   }
 
   const FieldDecl *D = dyn_cast<FieldDecl>(ME->getMemberDecl());
@@ -685,7 +690,8 @@ bool VolatileReorderChecker::handleOneExpr(Expr *E)
   if (!E)
     return false;
 
-  VisitedExprs.clear();
+  VisitedCallExprs.clear();
+  VisitedBinaryExprs.clear();
   ExpressionVolatileAccessVisitor V(this);
 
 #if 0
