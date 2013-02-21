@@ -291,13 +291,22 @@ bool ExpressionVolatileAccessVisitor::VisitBinaryOperator(BinaryOperator *BO)
       (Op == BO_LOr)) {
     Expr *E = BO->getLHS();
     ExpressionVolatileAccessVisitor V(ConsumerInstance);
-    V.TraverseStmt(E);
-    if (V.hasMultipleVolAccesses()) {
-      NumVolAccesses = V.getNumVolAccesses(); 
-      V.getVolAccesses(VolAccesses);
-      return false;
+    ExprMap::iterator EI = ConsumerInstance->VisitedExprs.find(E);
+
+    if (EI == ConsumerInstance->VisitedExprs.end()) {
+      V.TraverseStmt(E);
+      if (V.hasMultipleVolAccesses()) {
+        NumVolAccesses = V.getNumVolAccesses(); 
+        V.getVolAccesses(VolAccesses);
+        return false;
+      }
+      ConsumerInstance->VisitedExprs[E] = V.getNumVolAccesses();
     }
-    NumVolAccesses -= V.getNumVolAccesses();
+    else {
+      V.setNumVolAccesses((*EI).second);
+    }
+    if (V.getNumVolAccesses() > 0)
+      NumVolAccesses -= V.getNumVolAccesses();
   }
   return true;
 }
@@ -679,6 +688,13 @@ bool VolatileReorderChecker::handleOneExpr(Expr *E)
   VisitedExprs.clear();
   ExpressionVolatileAccessVisitor V(this);
 
+#if 0
+  std::string ES = "";
+  getExprString(E, ES);
+  llvm::outs() << "start on expr: " << ES << "\n";
+  llvm::outs().flush();
+#endif
+  
   V.TraverseStmt(E);
   if (!V.hasMultipleVolAccesses())
     return false;
