@@ -17,7 +17,10 @@ static RegisterChecker<VolatileReorderChecker>
          C("volatile-reorder", DescriptionMsg);
 
 typedef llvm::SmallVector<const Expr *, 5> ExprVector;
+
 typedef llvm::DenseMap<const Expr *, int> ExprMap;
+
+typedef llvm::SmallPtrSet<const clang::Expr *, 10> ExprSet;
 
 class VolatileAccessCollector : public 
   RecursiveASTVisitor<VolatileAccessCollector> {
@@ -149,12 +152,23 @@ public:
 
   void addOneVolAccess(const Expr *E);
 
+  unsigned getVolAccessesSize(void) {
+    return VolAccesses.size();
+  }
+
+  const Expr *getOneVolAccess(unsigned Idx) {
+    CheckerAssert((Idx < VolAccesses.size()) && "Invalid Index!");
+    return VolAccesses[Idx];
+  }
+
 private:
   bool hasVol(const QualType &QT);
 
   VolatileReorderChecker *ConsumerInstance;
 
   ExprVector VolAccesses;
+
+  ExprSet VisitedAccesses;
 
   int NumVolAccesses;
 
@@ -180,7 +194,8 @@ bool ExpressionVolatileAccessVisitor::hasVol(const QualType &QT)
 void ExpressionVolatileAccessVisitor::addOneVolAccess(const Expr *E)
 {
   CheckerAssert(E && "Null Expr!");
-  VolAccesses.push_back(E); 
+  if (!VisitedAccesses.count(E))
+    VolAccesses.push_back(E);
 }
 
 bool ExpressionVolatileAccessVisitor::VisitDeclRefExpr(DeclRefExpr *DRE)
@@ -220,6 +235,12 @@ bool ExpressionVolatileAccessVisitor::VisitMemberExpr(MemberExpr *ME)
     return true;
 
   IsFromMemberExpr = true;
+
+  // rule out &s.f1
+  if (IsFromAddrTaken) {
+    return true;
+  }
+
   if (hasVol(D->getType()))
     addOneVolAccess(ME);
 
@@ -301,12 +322,16 @@ bool ExpressionVolatileAccessVisitor::VisitBinaryOperator(BinaryOperator *BO)
         return false;
       }
       ConsumerInstance->VisitedBinaryExprs[E] = V.getNumVolAccesses();
+      if (V.getVolAccessesSize() == 1) {
+        VisitedAccesses.insert(V.getOneVolAccess(0));
+      }
     }
     else {
       V.setNumVolAccesses((*EI).second);
     }
-    if (V.getNumVolAccesses() > 0)
+    if (V.getNumVolAccesses() > 0) {
       NumVolAccesses -= V.getNumVolAccesses();
+    }
   }
   return true;
 }
