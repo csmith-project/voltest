@@ -1,5 +1,10 @@
+
 * volatile_checker is a tool that checks certain properties of volatile accesses.
-  Currently, it supports two individual checkers: which can be invoked by 
+
+* how to build the tool:
+  LLVM_PATH=/where/llvm-3.2/is/installed make
+
+* Currently, it supports two individual checkers: which can be invoked by 
   
   - access-once: given some variables, this checker checks if these variables are only accessed
     through ACCESS_ONCE() macro. The checker exits with 0 upon success.
@@ -50,4 +55,7 @@
   the one-access-between-two-sequence-points rule:
 
   csmith --strict-volatile-rule
+
+* Csmith command line option to generate programs with ACCESS_ONCE macros
+  csmith --enable-access-once
 
