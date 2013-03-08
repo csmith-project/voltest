@@ -4,7 +4,7 @@
 ## + Move downloaded tarballs to a downloads directory?
 ## + Delete the downloaded tarballs?
 ## + Remove the llvm-build directory?
-## + Build less of LLVM/Clang?
+## + Build less of LLVM+Clang?
 
 ###############################################################################
 
@@ -28,6 +28,12 @@ set -u
 # If you want a bunch of noise, set "quiet=" and "silent=".
 quiet=-q
 silent=-s
+
+ncpus=1
+if test -e /proc/cpuinfo; then
+  # Get the number of (virtual) CPUs on Linux.
+  ncpus=`cat /proc/cpuinfo | grep processor | wc -l`
+fi
 
 ###############################################################################
 
@@ -207,12 +213,15 @@ cd "$LLVM_OBJ_HOME"
 "$LLVM_SRC_HOME"/configure --prefix="$LLVM_HOME" > Configure.errs
 
 # Compile.
-# This takes about 120 minutes on a pc3000.
+# make     : This takes about 120 minutes on a pc3000.
+# make     : This takes about  50 minutes on a d710.
+# make -j4 : This takes about  15 minutes on a d710.
+# make -j8 : This takes about  12 minutes on a d710.
 #
 time=`date +%H:%M:%S`
-echo "*** [$time]" "  Compiling LLVM+Clang+Compiler-RT..."
+echo "*** [$time]" "  Compiling LLVM+Clang+Compiler-RT (-j$ncpus)..."
 #
-make > Make.errs 2>&1
+make -j"$ncpus" > Make.errs 2>&1
 
 # Install.
 # The C-Reduce build system only works against an installed LLVM/Clang,
