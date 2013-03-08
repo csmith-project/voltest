@@ -2,7 +2,7 @@
 
 use strict;
 
-open INF, "ps axu |" or die;
+open INF, "ps axuww |" or die;
 while (<INF>) {
     next if (!(/volatile\_test/));
     my @l = split /\s+/;
