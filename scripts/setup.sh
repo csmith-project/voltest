@@ -270,6 +270,28 @@ make > Make.errs 2>&1
 
 ###############################################################################
 
+## SET UP VOLATILE_CHECKER
+
+time=`date +%H:%M:%S`
+echo "*** [$time]" "Setting up volatile_checker..."
+
+# Get volatile_checker.
+#
+time=`date +%H:%M:%S`
+echo "*** [$time]" "  Acquiring volatile_checker sources..."
+
+svn co $quiet "$VOLATILE_CHECKER_SVN" "$VOLATILE_CHECKER_HOME"
+
+# Compile as directed by `volatile_checker/README.txt'.
+#
+time=`date +%H:%M:%S`
+echo "*** [$time]" "  Compiling volatile_checker..."
+#
+cd "$VOLATILE_CHECKER_HOME"
+make LLVM_PATH="$LLVM_HOME" > Make.errs 2>&1
+
+###############################################################################
+
 ## SET UP TEST DRIVER
 
 time=`date +%H:%M:%S`

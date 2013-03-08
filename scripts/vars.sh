@@ -85,6 +85,20 @@ PIN_URL="http://software.intel.com/sites/landingpage/pintool/downloads/$PIN_TGZ"
 
 ###############################################################################
 
+## VOLATILE_CHECKER
+
+VOLATILE_CHECKER_DIR=volatile_checker
+VOLATILE_CHECKER_HOME="$WORK_SRC_HOME/$VOLATILE_CHECKER_DIR"
+
+# What volatile_checker revision to use?
+# XXX Not yet implemented.
+VOLATILE_CHECKER_REV=
+
+# Where to download volatile_checker from, via SVN.
+VOLATILE_CHECKER_SVN=svn+ssh://shell.cs.utah.edu/uusoc/res/embed/users/regehr/embedded_code_repo/yang/volatile_checker
+
+###############################################################################
+
 ## VOLATILE_PINTRACE
 
 VOLATILE_PINTRACE_DIR=volatile_pintrace
