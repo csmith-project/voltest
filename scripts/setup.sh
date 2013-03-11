@@ -214,6 +214,7 @@ cd "$LLVM_OBJ_HOME"
 
 # Compile.
 # make     : This takes about 120 minutes on a pc3000.
+# make -j2 : This takes about  82 minutes on a pc3000.
 # make     : This takes about  50 minutes on a d710.
 # make -j4 : This takes about  15 minutes on a d710.
 # make -j8 : This takes about  12 minutes on a d710.
