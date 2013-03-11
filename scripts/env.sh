@@ -18,7 +18,10 @@ fi
 export CSMITH_HOME
 export PIN_HOME
 
-PATH="$CSMITH_HOME/utah/scripts/old_john_driver:$PATH"
+# Old driver:
+#   PATH="$CSMITH_HOME/utah/scripts/old_john_driver:$PATH"
+# New driver:
+PATH="$VOLATILE_PINTRACE_HOME:$PATH"
 export PATH
 
 ###############################################################################

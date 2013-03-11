@@ -28,7 +28,7 @@ launchn.pl
 
 # To stop the madness
 #
-# kill_random.pl
+# kill_voltest.pl
 
 ###############################################################################
 
