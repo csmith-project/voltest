@@ -311,11 +311,6 @@ echo "*** [$time]" "Patching Csmith test driver to configure targets..."
 patch $silent -d "$CSMITH_HOME/utah/scripts/old_john_driver" < \
   "$VOLTEST_HOME/patches/csmith/test-targets.patch"
 
-# Edit `kill_random.pl' so that it works correctly on Ubuntu 12.
-#
-patch $silent -d "$CSMITH_HOME/utah/scripts/old_john_driver" < \
-  "$VOLTEST_HOME/patches/csmith/kill_random.patch"
-
 ###############################################################################
 
 time=`date +%H:%M:%S`
