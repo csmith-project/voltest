@@ -155,7 +155,7 @@ make > Make.errs 2>&1
 # Edit Csmith driver scripts as directed by `volatile_pintrace/README.txt'.
 #
 time=`date +%H:%M:%S`
-echo "*** [$time]" "  Patching Csmith driver for volatile_pintrace..."
+echo "*** [$time]" "  Patching Csmith test driver for volatile_pintrace..."
 #
 patch $silent -d "$CSMITH_HOME/utah/scripts/old_john_driver" < \
   "$VOLTEST_HOME/patches/csmith/volatile_pintrace.patch"
@@ -310,6 +310,14 @@ echo "*** [$time]" "Patching Csmith test driver to configure targets..."
 #
 patch $silent -d "$CSMITH_HOME/utah/scripts/old_john_driver" < \
   "$VOLTEST_HOME/patches/csmith/test-targets.patch"
+
+time=`date +%H:%M:%S`
+echo "*** [$time]" "Patching volatile_pintrace test driver to configure targets..."
+
+# Edit `volatile_test.pl' to describe what you want to test.
+#
+patch $silent -d "$VOLATILE_PINTRACE_HOME" < \
+  "$VOLTEST_HOME/patches/volatile_pintrace/volatile_test.patch"
 
 ###############################################################################
 
