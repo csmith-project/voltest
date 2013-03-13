@@ -29,6 +29,9 @@ CPPFLAGS="-DINLINE= -DCSMITH_MINIMAL -DWRAP_VOLATILES=0 -I/local/randtest/src/cs
 
 # PIN_HOME: inherit this from the environment.
 
+# XXX blech!
+VOL_ADDR_FILE="/local/randtest/run/my/vol_addr.txt"
+
 ###############################################################################
 
 ## Environment configuration.
@@ -96,12 +99,12 @@ fi
 ## Initialization.
 
 DEBUG_ECHO=echo
-if [ $debug -eq 0 ]; then
+if [ $debug -ne 0 ]; then
   DEBUG_ECHO=:
 fi
 
 QUIET_ECHO=echo
-if [ $quiet -eq 0 ]; then
+if [ $quiet -ne 0 ]; then
   QUIET_ECHO=:
 fi
 
@@ -211,12 +214,12 @@ ccut1_exe_out=ccut1-exe-out.txt
 "$PIN_HOME/pin.sh" \
   -injection child \
   -t "$PIN_HOME/source/tools/ManualExamples/obj-intel64/pinatrace.so" \
-  -vol_input vol_addr.txt \
+  -vol_input "$VOL_ADDR_FILE" \
   -output_mode checksum \
   -- "$ccut1_exe" \
   > "$ccut1_exe_out"
 if [ $? -ne 0 ]; then
-  $QUIET_ECHO "$0: the program produced by $CCUT1 failed to run correctly"
+  $QUIET_ECHO "$0: the program produced by \"$CCUT1\" failed to run correctly"
   $NEAT_RM_OUTS
   exit 1
 fi
@@ -224,7 +227,7 @@ fi
 # The regular and volatile checksums of the program produced by the first
 # compiler under test.
 ccut1_exe_chk=ccut1-exe-out-chk.txt
-ccut1_exe_vchk=ccut-exe-out-vchk.txt
+ccut1_exe_vchk=ccut1-exe-out-vchk.txt
 
 $GREP -e "^checksum" "$ccut1_exe_out" > "$ccut1_exe_chk"
 # $? is 0 is lines were matched; 1 if no lines matched; >1 if error.
@@ -267,12 +270,12 @@ ccut2_exe_out=ccut2-exe-out.txt
 "$PIN_HOME/pin.sh" \
   -injection child \
   -t "$PIN_HOME/source/tools/ManualExamples/obj-intel64/pinatrace.so" \
-  -vol_input vol_addr.txt \
+  -vol_input "$VOL_ADDR_FILE" \
   -output_mode checksum \
   -- "$ccut2_exe" \
   > "$ccut2_exe_out"
 if [ $? -ne 0 ]; then
-  $QUIET_ECHO "$0: the program produced by $CCUT2 failed to run correctly"
+  $QUIET_ECHO "$0: the program produced by \"$CCUT2\" failed to run correctly"
   $NEAT_RM_OUTS
   exit 1
 fi
@@ -280,7 +283,7 @@ fi
 # The regular and volatile checksums of the program produced by the second
 # compiler under test.
 ccut2_exe_chk=ccut2-exe-out-chk.txt
-ccut2_exe_vchk=ccut-exe-out-vchk.txt
+ccut2_exe_vchk=ccut2-exe-out-vchk.txt
 
 $GREP -e "^checksum" "$ccut2_exe_out" > "$ccut2_exe_chk"
 # $? is 0 is lines were matched; 1 if no lines matched; >1 if error.
@@ -310,7 +313,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # If the volatile checksums are *not* different, this mutant is bad.
-$CMP -s "$ccut1_exe_chk" "$ccut2_exe_chk"
+$CMP -s "$ccut1_exe_vchk" "$ccut2_exe_vchk"
 if [ $? -eq 0 ]; then
   $QUIET_ECHO "$0: compiled programs yield the same volatile checksum"
   exit 1
