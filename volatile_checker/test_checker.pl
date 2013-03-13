@@ -5,7 +5,8 @@ use strict;
 use warnings;
 
 my %tests_dir = (
-  "reorder_test_dir" => "volatile-reorder"
+  "reorder_test_dir" => "volatile-reorder",
+  "volatile_address_test_dir" => "volatile-address"
 );
 
 my @failed_tests;
@@ -21,13 +22,17 @@ sub runit ($) {
   return $exit_value;
 }
 
-sub do_one_csmith_test($$) {
-  my ($csmith_home, $n) = @_;
+sub do_one_csmith_test($$$) {
+  my ($checker, $csmith_home, $n) = @_;
 
+  my $strict = "";
+  if ($checker eq "volatile-reorder") {
+    $strict = "--strict-volatile-rule --paranoid";
+  }
   my $subdir = sprintf "%05d", $n;
   mkdir "$subdir" or die;
   chdir $subdir or die;
-  my $csmith_cmd = "$csmith_home/src/csmith --strict-volatile-rule --paranoid --output $n.c";
+  my $csmith_cmd = "$csmith_home/src/csmith $strict --output $n.c";
   die "Csmith crashed!" if runit($csmith_cmd);
 
   my $gcc_cmd = "gcc $n.c -I$csmith_home/runtime -o $n.exe > /dev/null 2>&1";
@@ -44,7 +49,8 @@ sub do_one_csmith_test($$) {
   }
 
   die "preprocessing failed" if (runit("gcc -E -I$csmith_home/runtime $n.c > $n.preprocessed.c"));
-  my $checker_cmd = "../../volatile_checker --checker=volatile-reorder $n.preprocessed.c > $n.checker.out 2>&1";
+  my $checker_cmd = "../../volatile_checker --checker=$checker $n.preprocessed.c > $n.checker.out 2>&1";
+  print "$checker_cmd\n";
   die "checker failed!" if (runit($checker_cmd));
   print "iteration [$n] succeeded\n";
 
@@ -53,12 +59,14 @@ out:
   system "rm -rf $subdir" unless ($SAVE_TEMP);
 }
 
-sub test_against_csmith($) {
-  my ($iteration) = @_;
+sub test_against_csmith($$) {
+  my ($test, $iteration) = @_;
 
+  my $checker = $tests_dir{$test};
+  die unless defined($checker);
   my $csmith_home = $ENV{"CSMITH_HOME"};
   die "please set CSMITH_HOME env first!" unless (defined($csmith_home));
-  print "Starting testing volatile-reorder checker with Csmith...\n";
+  print "Starting testing $checker checker with Csmith...\n";
 
   my $working_dir = "tmp_csmith_testing";
   if (-d $working_dir) {
@@ -69,7 +77,7 @@ sub test_against_csmith($) {
   }
   chdir $working_dir or die;
   for (my $i = 0; $i < $iteration; $i++) {
-    do_one_csmith_test($csmith_home, $i);
+    do_one_csmith_test($checker, $csmith_home, $i);
   }
   chdir ".." or die;
   print "cwd: " . cwd() . "\n";
@@ -85,18 +93,18 @@ sub test_one_dir($$$) {
     print "  [$i]: $test ...";
     my $out = $test;
     $out =~ s/\.c$/\.out/;
-    if (!(-e $out)) {
-      push @failed_tests, $test;
-      print "failed\n";
-      next;
-    }
-
     if ($regenerate) {
       runit("../volatile_checker --checker=$checker $test > $out 2>&1");
       print "done\n";
       next;
     }
  
+    if (!(-e $out)) {
+      push @failed_tests, $test;
+      print "failed\n";
+      next;
+    }
+
     my $new_out = "$out.new";
     runit("../volatile_checker --checker=$checker $test > $new_out 2>&1");
     if (runit("diff $new_out $out")) {
@@ -110,8 +118,8 @@ sub test_one_dir($$$) {
   }
 }
 
-sub do_unit_test($) {
-  my ($regenerate) = @_;
+sub do_unit_test($$) {
+  my ($test, $regenerate) = @_;
 
   my $msg;
   if ($regenerate) {
@@ -124,6 +132,9 @@ sub do_unit_test($) {
 
   my $cwd = cwd();
   foreach my $dir (keys %tests_dir) {
+    if (defined($test)) {
+      next if ($dir ne $test);
+    }
     print "[*]$msg dir $dir\n";
     chdir $dir or die;
     my $checker = $tests_dir{$dir};
@@ -151,6 +162,7 @@ Usage: test_checker.pl
   --iteration: only work with --with-csmith option, determine the number of testing iteration (default: 100)
   --save-temp: only work with --with-csmith option, save temp files.
   --regenerate-test-output: re-generate test output
+  --test=[test-dir]: do unit test for one test dir
 ';
 
 sub die_with_help($) {
@@ -167,11 +179,15 @@ sub main() {
   my $with_csmith = 0;
   my $regenerate = 0;
   my $iteration = 100;
+  my $test = undef;
 
   while(defined ($opt = shift @ARGV)) {
     if ($opt =~ m/^--(.+)=(.+)$/) {
       if ($1 eq "iteration") {
         $iteration = $2;
+      }
+      elsif ($1 eq "test") {
+        $test = $2;
       }
       else {
         die_with_help($opt);
@@ -201,11 +217,16 @@ sub main() {
   }
 
   die_with_help("$ARGV[0]") if (@ARGV != 0);
+  if (defined($test)) {
+    die "Invalid test dir[$test]!" unless defined($tests_dir{$test});
+  }
+
   if ($with_csmith) {
-    test_against_csmith($iteration);
+    $test = "reorder_test_dir" if (!defined($test));
+    test_against_csmith($test, $iteration);
   }
   else {
-    do_unit_test($regenerate);
+    do_unit_test($test, $regenerate);
   }
 }
 
