@@ -209,7 +209,7 @@ sub run_csmith($$) {
   }
 
   my $cmd = "$CSMITH_BIN $SWARM_OPTS $CSMITH_VOL_OPTS --output $cfile";
-  my $csmith_cmd = "RunSafely.sh $CSMITH_TIMEOUT 1 /dev/null csmith_output.txt $cmd";
+  my $csmith_cmd = "RunSafely $CSMITH_TIMEOUT 1 /dev/null csmith_output.txt $cmd";
   my $res = runit($csmith_cmd);
   if (($res != 0) || !(-f "$cfile")) {
     print STDERR "CSMITH FAILED\n";
@@ -268,7 +268,7 @@ sub compile_cfile($$$$$$) {
   my ($arch, $compiler_cmd, $compiler_opt, $cfile, $exe, $redirect_output) = @_;
 
   my $compiler_out = "$exe.out";
-  my $cmd = "RunSafely.sh $COMPILER_TIMEOUT 1 /dev/null $compiler_out $compiler_cmd $compiler_opt $COMPILER_COMMON_OPTS -I$CSMITH_HOME/runtime $cfile -o $exe";
+  my $cmd = "RunSafely $COMPILER_TIMEOUT 1 /dev/null $compiler_out $compiler_cmd $compiler_opt $COMPILER_COMMON_OPTS -I$CSMITH_HOME/runtime $cfile -o $exe";
   print "[$arch]: $compiler_cmd $compiler_opt: $cmd\n";
   my $res = runit($cmd);
   if ($res || !(-f $exe)) {
@@ -288,9 +288,9 @@ sub compile_cfile($$$$$$) {
 sub run_exe($$$$) {
   my ($exe, $compiler, $raw_out, $redirect_output) = @_;
  
-  my $res = runit("RunSafely.sh $PROG_TIMEOUT 1 /dev/null $raw_out ./$exe");
+  my $res = runit("RunSafely $PROG_TIMEOUT 1 /dev/null $raw_out ./$exe");
   if ($res == 0) {
-    my $pin_cmd = "RunSafely.sh $PIN_PROG_TIMEOUT 1 /dev/null $raw_out $PIN_BIN $PIN_OUTPUT_MODE $PIN_SEED $PIN_RANDOM_READ -- ./$exe";
+    my $pin_cmd = "RunSafely $PIN_PROG_TIMEOUT 1 /dev/null $raw_out $PIN_BIN $PIN_OUTPUT_MODE $PIN_SEED $PIN_RANDOM_READ -- ./$exe";
     $res = runit($pin_cmd);
   }
 
@@ -625,9 +625,9 @@ sub check_prereqs() {
   chdir $tmp_dir or die;
   print_msg("succeeded\n");
 
-  print_msg("checking RunSafely.sh...\n");
-  my $res = runit("RunSafely.sh 10 1 /dev/null ls_output.txt ls");
-  die "failed: is RunSafely.sh in the PATH env?" if ($res);
+  print_msg("checking RunSafely...\n");
+  my $res = runit("RunSafely 10 1 /dev/null ls_output.txt ls");
+  die "failed: is RunSafely in the PATH env?" if ($res);
   print_msg("succeeded\n");
 
   print_msg("testing Csmith...\n");
