@@ -50,7 +50,7 @@ sub do_one_csmith_test($$$) {
 
   die "preprocessing failed" if (runit("gcc -E -I$csmith_home/runtime $n.c > $n.preprocessed.c"));
   my $checker_cmd = "../../volatile_checker --checker=$checker $n.preprocessed.c > $n.checker.out 2>&1";
-  print "$checker_cmd\n";
+  # print "$checker_cmd\n";
   die "checker failed!" if (runit($checker_cmd));
   print "iteration [$n] succeeded\n";
 
