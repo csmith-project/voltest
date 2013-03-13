@@ -31,13 +31,16 @@ LIBS = -lclangFrontendTool -lclangFrontend -lclangDriver -lclangSerialization \
        ${LLVM_LIBS} -ldl
 
 CHECKER_HEADERS = AccessOnceChecker.h \
-                  VolatileReorderChecker.h
+                  VolatileReorderChecker.h \
+                  VolatileAddressChecker.h 
 
 CHECKER_SOURCES = AccessOnceChecker.cpp \
-                  VolatileReorderChecker.cpp
+                  VolatileReorderChecker.cpp \
+                  VolatileAddressChecker.cpp
 
 CHECKER_OBJS = AccessOnceChecker.o \
-               VolatileReorderChecker.o
+               VolatileReorderChecker.o \
+               VolatileAddressChecker.o
  
 OBJS = VolatileChecker.o \
        CheckerManager.o \
@@ -62,6 +65,8 @@ Checker.o: Checker.cpp Checker.h
 AccessOnceChecker.o: AccessOnceChecker.cpp AccessOnceChecker.h ${CHECKER_DEPS}
 
 VolatileReorderChecker.o: VolatileReorderChecker.cpp VolatileReorderChecker.h ${CHECKER_DEPS}
+
+VolatileAddressChecker.o: VolatileAddressChecker.cpp VolatileAddressChecker.h ${CHECKER_DEPS}
 
 clean:
 	rm -rf *.o
