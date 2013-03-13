@@ -131,7 +131,7 @@ my @ALL_SWARM_OPTS = (
 my $PIN_ADDR_FILE = "vol_addr.txt";
 my $PIN_BIN = "$PIN_HOME/pin.sh -injection child -t $PIN_HOME/source/tools/ManualExamples/obj-intel64/pinatrace.so -vol_input $PIN_ADDR_FILE";
 my $CSMITH_BIN = "$CSMITH_HOME/src/csmith";
-my $CSMITH_VOL_OPTS = "--enable-volatile-tests x86_64 --vol-addr-file $PIN_ADDR_FILE";
+my $CSMITH_VOL_OPTS = "";
 
 my $MIN_PROGRAM_SIZE = 30000;
 my $COMPILER_TIMEOUT = 600;
