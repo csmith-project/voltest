@@ -583,46 +583,30 @@ VOID Instruction(INS ins, VOID *v)
     }
 }
 
-VOID VolFiniBefore(void)
+VOID StartLogging(void)
 {
-    if (InitVolTable(KnobInputFile.Value())) {
-        cerr << "InitVolTable Error" << endl;
-        exit(-1);
-    }
-
     logging = TRUE;
-    INS_AddInstrumentFunction(Instruction, 0);
 }
 
-VOID func1After(void)
+VOID StopLogging(void)
 {
     logging = FALSE;
 }
 
 VOID Image(IMG img, VOID * v)
 {
-    RTN volInitRtn = RTN_FindByName(img, "csmith_volatile_fini");
+    RTN volInitRtn = RTN_FindByName(img, "main");
 
     if (RTN_Valid(volInitRtn)) {
         RTN_Open(volInitRtn);
-
-        //RTN_InsertCall(volInitRtn, IPOINT_AFTER, (AFUNPTR)VolInitAfter, IARG_END);
-        RTN_InsertCall(volInitRtn, IPOINT_BEFORE, (AFUNPTR)VolFiniBefore, IARG_END);
-
+        INS ins = RTN_InsHead(volInitRtn);
+        if (!INS_Valid(ins))
+          return;
+        // start logging before the first instruction of main
+        INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)StartLogging, IARG_END);
+        RTN_InsertCall(volInitRtn, IPOINT_AFTER, (AFUNPTR)StopLogging, IARG_END);
         RTN_Close(volInitRtn);
     }
-
-/*
-    RTN func1Rtn = RTN_FindByName(img, "func_1");
-
-    if (RTN_Valid(func1Rtn)) {
-        RTN_Open(func1Rtn);
-
-        RTN_InsertCall(func1Rtn, IPOINT_AFTER, (AFUNPTR)func1After, IARG_END);
-
-        RTN_Close(func1Rtn);
-    }
-*/
 }
 
 VOID Fini(INT32 code, VOID *v)
@@ -681,7 +665,13 @@ int main(int argc, char *argv[])
         srand48(seed);
     }
 
+    if (InitVolTable(KnobInputFile.Value())) {
+        cerr << "InitVolTable Error" << endl;
+        exit(-1);
+    }
+
     IMG_AddInstrumentFunction(Image, 0);
+    INS_AddInstrumentFunction(Instruction, 0);
     PIN_AddFiniFunction(Fini, 0);
 
     // Never returns
