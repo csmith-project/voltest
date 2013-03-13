@@ -14,6 +14,7 @@ namespace clang {
   class DeclaratorDecl;
   class RecordDecl;
   class ArrayType;
+  class QualType;
 }
 
 class VolatileAddressVisitor;
@@ -77,7 +78,7 @@ private:
                              uint64_t Sz,
                              const std::string &PtrStr);
 
-  std::string getPointerStr(const clang::Type *Ty);
+  std::string getPointerStr(const clang::QualType &QT);
 
   bool setAccessOnceVarMode(const std::string &ModeStr);
 

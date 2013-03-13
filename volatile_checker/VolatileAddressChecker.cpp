@@ -128,6 +128,9 @@ void VolatileAddressChecker::handleOneStructure(const std::string &Prefix,
                                                 uint64_t Offset,
                                                 const RecordDecl *RD)
 {
+  if (!RD->getDefinition())
+    return;
+
   const ASTRecordLayout &Info = Context->getASTRecordLayout(RD);
   unsigned Count = Info.getFieldCount(); (void)Count;
 
@@ -190,16 +193,16 @@ void VolatileAddressChecker::handleOneDeclaratorDecl(const std::string &Prefix,
                                                const DeclaratorDecl *DD)
 {
   QualType QT = DD->getType();
-  const Type *Ty = QT.getTypePtr();
 
   if (QT.isVolatileQualified()) {
     addOneVolatileAddress(Prefix + DD->getNameAsString(),
                           Offset,
                           Context->getTypeSize(QT),
-                          getPointerStr(Ty));
+                          getPointerStr(QT));
     return;
   }
 
+  const Type *Ty = QT.getTypePtr();
   if (const RecordType *RT = Ty->getAsStructureType()) {
     const RecordDecl *RD = RT->getDecl();
     handleOneStructure(Prefix + DD->getNameAsString() + ".", Offset, RD);
@@ -230,11 +233,26 @@ void VolatileAddressChecker::handleOneVarDecl(const VarDecl *VD)
       !AccessOnceVars.count(VD))
     return;
 
+  if (AccessOnceVars.count(VD)) {
+    QualType QT = VD->getType();
+    addOneVolatileAddress(VD->getNameAsString(),
+                          0,
+                          Context->getTypeSize(QT),
+                          getPointerStr(QT));
+    return;
+  }
+
   handleOneDeclaratorDecl("", 0, VD);
 }
 
-std::string VolatileAddressChecker::getPointerStr(const Type *Ty)
+std::string VolatileAddressChecker::getPointerStr(const QualType &QT)
 {
+  const Type *Ty;
+  if (const ArrayType *AT = Context->getAsArrayType(QT))
+    Ty = Context->getBaseElementType(AT).getTypePtr();
+  else
+    Ty = QT.getTypePtr();
+
   if (Ty->isPointerType())
     return "pointer";
   else
