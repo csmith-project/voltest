@@ -1,0 +1,4 @@
+g1; 0; 64; pointer
+g2; 0; 64; pointer
+g3; 0; 32; non-pointer
+Succeeded
