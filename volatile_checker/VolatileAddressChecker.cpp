@@ -145,9 +145,13 @@ void VolatileAddressChecker::handleOneStructure(const std::string &Prefix,
       QualType QT = FD->getType();
       if (!QT.isVolatileQualified())
         continue;
+      uint64_t Field_Sz = FD->getBitWidthValue(*Context);
+      // omit zero-sz bitfield
+      if (!Field_Sz)
+        continue;
       addOneVolatileAddress(Prefix + FD->getNameAsString(),
                             Field_Off,
-                            FD->getBitWidthValue(*Context),
+                            Field_Sz,
                             "non-pointer");
     }
     else {
