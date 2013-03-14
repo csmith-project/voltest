@@ -24,6 +24,9 @@ my $WORKING_DIR = "work0";
 my $ITERATION = 100;
 my $USE_SWARM = 1;
 my $VERBOSE = 1;
+my $CHECKER;
+my $GEN_VOLATILE_ADDR;
+my $RunSafely;
 
 ##########################################################
 # compilers under test
@@ -209,7 +212,7 @@ sub run_csmith($$) {
   }
 
   my $cmd = "$CSMITH_BIN $SWARM_OPTS $CSMITH_VOL_OPTS --output $cfile";
-  my $csmith_cmd = "RunSafely $CSMITH_TIMEOUT 1 /dev/null csmith_output.txt $cmd";
+  my $csmith_cmd = "$RunSafely $CSMITH_TIMEOUT 1 /dev/null csmith_output.txt $cmd";
   my $res = runit($csmith_cmd);
   if (($res != 0) || !(-f "$cfile")) {
     print STDERR "CSMITH FAILED\n";
@@ -268,7 +271,7 @@ sub compile_cfile($$$$$$) {
   my ($arch, $compiler_cmd, $compiler_opt, $cfile, $exe, $redirect_output) = @_;
 
   my $compiler_out = "$exe.out";
-  my $cmd = "RunSafely $COMPILER_TIMEOUT 1 /dev/null $compiler_out $compiler_cmd $compiler_opt $COMPILER_COMMON_OPTS -I$CSMITH_HOME/runtime $cfile -o $exe";
+  my $cmd = "$RunSafely $COMPILER_TIMEOUT 1 /dev/null $compiler_out $compiler_cmd $compiler_opt $COMPILER_COMMON_OPTS -I$CSMITH_HOME/runtime $cfile -o $exe";
   print "[$arch]: $compiler_cmd $compiler_opt: $cmd\n";
   my $res = runit($cmd);
   if ($res || !(-f $exe)) {
@@ -288,9 +291,10 @@ sub compile_cfile($$$$$$) {
 sub run_exe($$$$) {
   my ($exe, $compiler, $raw_out, $redirect_output) = @_;
  
-  my $res = runit("RunSafely $PROG_TIMEOUT 1 /dev/null $raw_out ./$exe");
+  my $res = runit("$RunSafely $PROG_TIMEOUT 1 /dev/null $raw_out ./$exe");
   if ($res == 0) {
-    my $pin_cmd = "RunSafely $PIN_PROG_TIMEOUT 1 /dev/null $raw_out $PIN_BIN $PIN_OUTPUT_MODE $PIN_SEED $PIN_RANDOM_READ -- ./$exe";
+    my $pin_cmd = "$RunSafely $PIN_PROG_TIMEOUT 1 /dev/null $raw_out $PIN_BIN $PIN_OUTPUT_MODE $PIN_SEED $PIN_RANDOM_READ -- ./$exe";
+    print "$pin_cmd\n";
     $res = runit($pin_cmd);
   }
 
@@ -410,8 +414,8 @@ sub parse_output($) {
   return ($checksum, $vol_str);
 }
 
-sub test_one_compiler($$) {
-  (my $root, my $compiler_ref) = @_;
+sub test_one_compiler($$$) {
+  my ($root, $compiler_ref, $checker_out) = @_;
 
   my ($arch, undef, $compiler, $optref) = @{$compiler_ref};
   my @OPTS = @{$optref};
@@ -431,10 +435,16 @@ sub test_one_compiler($$) {
       next;
     }
 
+    my $res = runit("$GEN_VOLATILE_ADDR --address-file=$checker_out $exe > $PIN_ADDR_FILE 2>&1");
+    if ($res != 0) {
+      print STDERR "$GEN_VOLATILE_ADDR failed to run\n";
+      return (1, undef, undef, undef);
+    }
+
     my $raw_out = "$exe.raw-out";
-    my $res = run_exe($exe, $compiler, $raw_out, 0);
-    if (-f "vol_addr.txt") {
-      system("mv vol_addr.txt ${exe}_vol_addr.txt");
+    $res = run_exe($exe, $compiler, $raw_out, 0);
+    if (-f "$PIN_ADDR_FILE") {
+      system("mv $PIN_ADDR_FILE ${exe}_vol_addr.txt");
     }
     if ($res == $TIMEOUT_RES) {
       my $timeout = "TIMEOUT";
@@ -504,9 +514,21 @@ sub test_one_program($) {
   my $vol_result;
   my $csum;
 
+  my $checker_out = "$root.checker.out";
+  my $res = runit("gcc -E -I$CSMITH_HOME/runtime $root.c > ${root}.pre.i 2>&1");
+  if ($res) {
+    print STDERR "preprocessor FAILED!\n";
+    return -1;
+  }
+  $res = runit("$CHECKER --checker=volatile-address $root.pre.i > $checker_out 2>&1");
+  if ($res) {
+    print STDERR "volatile_checker FAILURE\n";
+    return -1;
+  }
+
   foreach my $compiler_ref (@compilers_to_test) {
     (my $abort_test, my $consistent, my $tmp_vol_result, my $tmp_csum) =
-        test_one_compiler ($root, $compiler_ref);
+        test_one_compiler ($root, $compiler_ref, $checker_out);
 
     return -1 if ($abort_test);
 
@@ -587,7 +609,7 @@ Usage: volatile_test.pl --work-dir=[dir] --pin-output-mode=[checksum|verbose|sum
   --work-dir=[dir]: specify the work-dir (default: work0)
   --pin-output-mode=[checksum|verbose|summary]: specify the output mode of the pintool (default: checksum)
   --enable-pin-random-read: enable pintool to inject random values to volatile reads
-  --iterations=[num]: specify how many testing iterations (default: 100000000)
+  --iteration=[num]: specify how many testing runs (default: 100000000)
   --disable-swarm: disable swarm options
   --help: this message
 ';
@@ -626,9 +648,29 @@ sub check_prereqs() {
   print_msg("succeeded\n");
 
   print_msg("checking RunSafely...\n");
-  my $res = runit("RunSafely 10 1 /dev/null ls_output.txt ls");
-  die "failed: is RunSafely in the PATH env?" if ($res);
+  $RunSafely = "$cwd/RunSafely";
+  my $res = runit("$RunSafely 10 1 /dev/null ls_output.txt ls");
+  die "failed: is $RunSafely in the PATH env?" if ($res);
   print_msg("succeeded\n");
+
+  print_msg("checking volatile_checker...\n");
+  $CHECKER = "volatile_checker";
+  if (runit("$CHECKER --help > /dev/null 2>&1")) {
+    print_msg("volatile_checker is not in PATH env\n");
+    print_msg("one more try...\n");
+    $CHECKER = "$cwd/../volatile_checker/volatile_checker";
+    if (runit("$CHECKER --help > /dev/null 2>&1")) {
+      die "cannot find volatile_checker!";
+    }
+  }
+  print_msg("succeeded: $CHECKER\n");
+
+  print_msg("checking gen_volatile_addr.pl...\n");
+  $GEN_VOLATILE_ADDR = "$cwd/gen_volatile_addr.pl";
+  if (runit("$GEN_VOLATILE_ADDR --help > /dev/null 2>&1")) {
+    die "failed to run $GEN_VOLATILE_ADDR!";
+  }
+  print_msg("succedded\n");
 
   print_msg("testing Csmith...\n");
   my $cmd = "$CSMITH_BIN --help > /dev/null 2>&1";
@@ -643,11 +685,14 @@ sub check_prereqs() {
   my $csmith_ok = 0;
   my $test_case_ok = 0;
   my $run_exe_ok = 0;
+  my $checker_out = "checker.addr.out";
   while ($tries > 0) {
     $tries--;
     next if (run_csmith($cfile, 0));
     $csmith_ok = 1;
     next if (compile_cfile("ia32", "gcc", "-O0", $cfile, $exe, 0));
+    next if (runit("$CHECKER --checker=volatile-address $cfile > $checker_out 2>&1"));
+    next if (runit("$GEN_VOLATILE_ADDR --address-file=$checker_out $exe > $PIN_ADDR_FILE 2>&1"));
     $test_case_ok = 1;
     my $raw_out = "$exe.raw-out";
     if (run_exe($exe, "gcc", $raw_out, 0) == 0) {
