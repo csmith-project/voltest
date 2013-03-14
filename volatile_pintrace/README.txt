@@ -32,6 +32,7 @@ Volatile tests howto:
   * how to invoke volatile_checker to generate volatile offsets/sizes;
   * how to invoke gen_volatile_addr.pl to generate actual volatile addresses;
   * how to invoke frama-c to avoid undefined behavior
+  * also making sure to exclude the line `Pin child' when diff out1.txt and out2.txt
 
 --------------------------------------------------------------------
 Some details about pinatrace:
