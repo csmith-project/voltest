@@ -4,7 +4,7 @@
 * how to build the tool:
   LLVM_PATH=/where/llvm-3.2/is/installed make
 
-* Currently, it supports two individual checkers: which can be invoked by 
+* Currently, it supports three individual checkers: which can be invoked by 
   
   - access-once: given some variables, this checker checks if these variables are only accessed
     through ACCESS_ONCE() macro. The checker exits with 0 upon success.
@@ -50,6 +50,17 @@
 
    The detailed output is for manual analysis, and checking the exit value should be sufficient
    for writing testing oracle such as test1.sh.
+
+  - volatile-address: generates size/offset of each volatile variable.
+    invoked using the command below:
+    volatile_checker --checker=volatile-address [--address-output=filename] [--handle-access-once-vars=[all|none|only]] foo.c
+    
+    where --address-output and --handle-access-once-vars are optional:
+      --address-output specifies where to dump the result.  (default is stdout)
+      --handle-access-once-vars=[all|none|only]: specifies the way to handle variables accessed through ACCESS_ONCE macro.
+        [all]: the checker will output sizes/offsets of volatile variables and variables accessed through ACCESS_ONCE macro; (this is the default behavior)
+        [none]: the checker will *not* output sizes/offsets of variables accessed through ACCESS_ONCE;
+        [only]: the checker will output sizes/offset of *only* variables accessed through ACCESS_ONCE
 
 * Csmith command line option to generate programs which strictly conform with 
   the one-access-between-two-sequence-points rule:
