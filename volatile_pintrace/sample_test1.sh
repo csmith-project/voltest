@@ -38,10 +38,10 @@ if
   ! grep 'comparison between pointer and integer' outa.txt &&\
   /scratch/chenyang/embedded_code_repo/yang/volatile_checker/volatile_checker --checker=volatile-address small.c > checker.out.txt 2>&1 &&\
    clang -O0  -w small.c -o small1 > cc_out1.txt 2>&1 &&\
-  /scratch/chenyang/embedded_code_repo/yang/volatile_pintrace/gen_volatile_addr.pl --address-file=checker.out.txt small1 > vol_addr_out1.txt 2>&1 &&\
+  /scratch/chenyang/embedded_code_repo/yang/volatile_pintrace/gen_volatile_addr.pl --vars-file=checker.out.txt small1 > vol_addr_out1.txt 2>&1 &&\
   RunSafely.sh 3 1 /dev/null out1.txt ${PIN_CMD} -vol_input vol_addr_out1.txt -- ./small1 >/dev/null 2>&1 &&\
    clang -O1 small.c -o small2 > cc_out2.txt 2>&1 &&\
-  /scratch/chenyang/embedded_code_repo/yang/volatile_pintrace/gen_volatile_addr.pl --address-file=checker.out.txt small2 > vol_addr_out2.txt 2>&1 &&\
+  /scratch/chenyang/embedded_code_repo/yang/volatile_pintrace/gen_volatile_addr.pl --vars-file=checker.out.txt small2 > vol_addr_out2.txt 2>&1 &&\
   RunSafely.sh 3 1 /dev/null out2.txt ${PIN_CMD} -vol_input vol_addr_out2.txt -- ./small2 >/dev/null 2>&1 &&\
   ! diff -I "Pin child" out1.txt out2.txt &&\
   cp small.c small-framac.c &&\

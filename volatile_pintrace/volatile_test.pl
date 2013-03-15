@@ -435,7 +435,7 @@ sub test_one_compiler($$$) {
       next;
     }
 
-    my $res = runit("$GEN_VOLATILE_ADDR --address-file=$checker_out $exe > $PIN_ADDR_FILE 2>&1");
+    my $res = runit("$GEN_VOLATILE_ADDR --vars-file=$checker_out $exe > $PIN_ADDR_FILE 2>&1");
     if ($res != 0) {
       print STDERR "$GEN_VOLATILE_ADDR failed to run\n";
       return (1, undef, undef, undef);
@@ -692,7 +692,7 @@ sub check_prereqs() {
     $csmith_ok = 1;
     next if (compile_cfile("ia32", "gcc", "-O0", $cfile, $exe, 0));
     next if (runit("$CHECKER --checker=volatile-address $cfile > $checker_out 2>&1"));
-    next if (runit("$GEN_VOLATILE_ADDR --address-file=$checker_out $exe > $PIN_ADDR_FILE 2>&1"));
+    next if (runit("$GEN_VOLATILE_ADDR --vars-file=$checker_out $exe > $PIN_ADDR_FILE 2>&1"));
     $test_case_ok = 1;
     my $raw_out = "$exe.raw-out";
     if (run_exe($exe, "gcc", $raw_out, 0) == 0) {
