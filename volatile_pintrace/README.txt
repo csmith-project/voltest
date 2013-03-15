@@ -28,11 +28,13 @@ Volatile tests howto:
   * ./volatile_test.pl  (use ./volatile_test.pl --help to check its usage)
 
 - test case reduction using creduce
+  make sure preprocess the random program first, then do reduction
+
   sample_test1.sh provides a sample test oracle. It shows:
   * how to invoke volatile_checker to generate volatile offsets/sizes;
   * how to invoke gen_volatile_addr.pl to generate actual volatile addresses;
   * how to invoke frama-c to avoid undefined behavior
-  * also making sure to exclude the line `Pin child' when diff out1.txt and out2.txt
+  * also making sure exclude the line `Pin child' when diff out1.txt and out2.txt
 
 --------------------------------------------------------------------
 Some details about pinatrace:
