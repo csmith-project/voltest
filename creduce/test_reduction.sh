@@ -14,8 +14,6 @@
 ##   + the "volatile access checksums" of the two compiled programs are
 ##     different
 ##
-## XXX --- As reductions happen, what happens to `vol_addr.txt'?
-## XXX --- Does creduce handle the vol_addr.txt file at all?
 
 ###############################################################################
 
@@ -29,9 +27,6 @@ CPPFLAGS="-DINLINE= -DCSMITH_MINIMAL -DWRAP_VOLATILES=0 -I/local/randtest/src/cs
 
 # PIN_HOME: inherit this from the environment.
 
-# XXX blech!
-VOL_ADDR_FILE="/local/randtest/run/my/vol_addr.txt"
-
 ###############################################################################
 
 ## Environment configuration.
@@ -41,6 +36,9 @@ CMP=cmp
 GCC=gcc
 GREP=grep
 RM=rm
+
+VOL_CHECKER=/local/randtest/src/volatile_checker/volatile_checker
+VOL_ADDR_GEN=/local/randtest/src/volatile_pintrace/gen_volatile_addr.pl
 
 ###############################################################################
 
@@ -113,8 +111,8 @@ if [ $neat -eq 0 ]; then
   NEAT_RM_OUTS=:
 fi
 
-ulimit -t 1
-ulimit -v 2000000
+# ulimit -t 1
+# ulimit -v 2000000
 
 # Remove any lingering temporary files.
 $NEAT_RM_OUTS
@@ -125,7 +123,10 @@ $NEAT_RM_OUTS
 
 clang_out=clang-out.txt
 
-$CLANG -c -pedantic -Wall -O0 $CPPFLAGS "$filename" > "$clang_out" 2>&1
+$CLANG -c -pedantic -Wall -O0 $CPPFLAGS \
+  "$filename" \
+  -o /dev/null \
+  > "$clang_out" 2>&1
 if [ $? -ne 0 ]; then
   $QUIET_ECHO "$0: clang could not compile \"$filename\""
   $NEAT_RM_OUTS
@@ -160,7 +161,10 @@ fi
 
 gcc_out=gcc-out.txt
 
-$GCC -c -Wall -Wextra -O1 $CPPFLAGS "$filename" > "$gcc_out" 2>&1
+$GCC -c -Wall -Wextra -O1 $CPPFLAGS \
+  "$filename" \
+  -o /dev/null \
+  > "$gcc_out" 2>&1
 if [ $? -ne 0 ]; then
   $QUIET_ECHO "$0: gcc could not compile \"$filename\""
   $NEAT_RM_OUTS
@@ -188,7 +192,33 @@ if [ $? -ne 1 ]; then
   $NEAT_RM_OUTS
   exit 1
 fi
-  
+
+###############################################################################
+
+## Use our volatile_checker tool to weed out "broken" programs.
+
+checker_out=checker-out.txt
+
+$VOL_CHECKER --checker=volatile-reorder "$filename" > "$checker_out" 2>&1
+if [ $? -ne 0 ]; then
+  $QUIET_ECHO "$0: \"$filename\" contains ill-ordered volatile accesses"
+  $NEAT_RM_OUTS
+  exit 1
+fi
+
+###############################################################################
+
+## Extract information about the volatiles in the program.
+
+vol_vars=vol-vars-out.txt
+
+$VOL_CHECKER --checker=volatile-address "$filename" > "$vol_vars" 2>&1
+if [ $? -ne 0 ]; then
+  $QUIET_ECHO "$0: volatile-variable extractor failed"
+  $NEAT_RM_OUTS
+  exit 1
+fi
+
 ###############################################################################
 
 ## Compile and run the mutant using first compiler under test.
@@ -203,7 +233,20 @@ $CCUT1 \
   -o "$ccut1_exe" \
   > "$ccut1_out" 2>&1
 if [ $? -ne 0 ]; then
-  $QUIET_ECHO "$0: $CCUT1 could not compile \"$filename\""
+  $QUIET_ECHO "$0: $CCUT1: could not compile \"$filename\""
+  $NEAT_RM_OUTS
+  exit 1
+fi
+
+# The addresses of volatile locations in the program produced by the first
+# compiler under test.
+ccut1_exe_vol_addrs=ccut1-exe-vol-addrs-out.txt
+
+$VOL_ADDR_GEN --address-file="$vol_vars" \
+  "$ccut1_exe" \
+  > "$ccut1_exe_vol_addrs" 2>&1
+if [ $? -ne 0 ]; then
+  $QUIET_ECHO "$0: $CCUT1: volatile-address extractor failed"
   $NEAT_RM_OUTS
   exit 1
 fi
@@ -214,12 +257,12 @@ ccut1_exe_out=ccut1-exe-out.txt
 "$PIN_HOME/pin.sh" \
   -injection child \
   -t "$PIN_HOME/source/tools/ManualExamples/obj-intel64/pinatrace.so" \
-  -vol_input "$VOL_ADDR_FILE" \
+  -vol_input "$ccut1_exe_vol_addrs" \
   -output_mode checksum \
   -- "$ccut1_exe" \
   > "$ccut1_exe_out"
 if [ $? -ne 0 ]; then
-  $QUIET_ECHO "$0: the program produced by \"$CCUT1\" failed to run correctly"
+  $QUIET_ECHO "$0: $CCUT1: compiled program failed to run correctly"
   $NEAT_RM_OUTS
   exit 1
 fi
@@ -259,7 +302,20 @@ $CCUT2 \
   -o "$ccut2_exe" \
   > "$ccut2_out" 2>&1
 if [ $? -ne 0 ]; then
-  $QUIET_ECHO "$0: $CCUT2 could not compile \"$filename\""
+  $QUIET_ECHO "$0: $CCUT2: could not compile \"$filename\""
+  $NEAT_RM_OUTS
+  exit 1
+fi
+
+# The addresses of volatile locations in the program produced by the second
+# compiler under test.
+ccut2_exe_vol_addrs=ccut2-exe-vol-addrs-out.txt
+
+$VOL_ADDR_GEN --address-file="$vol_vars" \
+  "$ccut2_exe" \
+  > "$ccut2_exe_vol_addrs" 2>&1
+if [ $? -ne 0 ]; then
+  $QUIET_ECHO "$0: $CCUT2: volatile-address extractor failed"
   $NEAT_RM_OUTS
   exit 1
 fi
@@ -270,12 +326,12 @@ ccut2_exe_out=ccut2-exe-out.txt
 "$PIN_HOME/pin.sh" \
   -injection child \
   -t "$PIN_HOME/source/tools/ManualExamples/obj-intel64/pinatrace.so" \
-  -vol_input "$VOL_ADDR_FILE" \
+  -vol_input "$ccut2_exe_vol_addrs" \
   -output_mode checksum \
   -- "$ccut2_exe" \
   > "$ccut2_exe_out"
 if [ $? -ne 0 ]; then
-  $QUIET_ECHO "$0: the program produced by \"$CCUT2\" failed to run correctly"
+  $QUIET_ECHO "$0: $CCUT2: compiled program failed to run correctly"
   $NEAT_RM_OUTS
   exit 1
 fi
