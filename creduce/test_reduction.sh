@@ -27,6 +27,8 @@ CPPFLAGS="-DINLINE= -DCSMITH_MINIMAL -DWRAP_VOLATILES=0 -I/local/randtest/src/cs
 
 # PIN_HOME: inherit this from the environment.
 
+TIMEOUT=5
+
 ###############################################################################
 
 ## Environment configuration.
@@ -36,6 +38,8 @@ CMP=cmp
 GCC=gcc
 GREP=grep
 RM=rm
+
+RUNSAFELY=RunSafely
 
 VOL_CHECKER=/local/randtest/src/volatile_checker/volatile_checker
 VOL_ADDR_GEN=/local/randtest/src/volatile_pintrace/gen_volatile_addr.pl
@@ -254,13 +258,14 @@ fi
 # The output of the program produced by the first compiler under test.
 ccut1_exe_out=ccut1-exe-out.txt
 
+$RUNSAFELY $TIMEOUT 1 /dev/null "$ccut1_exe_out" \
 "$PIN_HOME/pin.sh" \
   -injection child \
   -t "$PIN_HOME/source/tools/ManualExamples/obj-intel64/pinatrace.so" \
   -vol_input "$ccut1_exe_vol_addrs" \
   -output_mode checksum \
   -- "$ccut1_exe" \
-  > "$ccut1_exe_out"
+  > /dev/null 2>&1
 if [ $? -ne 0 ]; then
   $QUIET_ECHO "$0: $CCUT1: compiled program failed to run correctly"
   $NEAT_RM_OUTS
@@ -323,13 +328,14 @@ fi
 # The output of the program produced by the second compiler under test.
 ccut2_exe_out=ccut2-exe-out.txt
 
+$RUNSAFELY $TIMEOUT 1 /dev/null "$ccut2_exe_out" \
 "$PIN_HOME/pin.sh" \
   -injection child \
   -t "$PIN_HOME/source/tools/ManualExamples/obj-intel64/pinatrace.so" \
   -vol_input "$ccut2_exe_vol_addrs" \
   -output_mode checksum \
   -- "$ccut2_exe" \
-  > "$ccut2_exe_out"
+  > /dev/null 2>&1
 if [ $? -ne 0 ]; then
   $QUIET_ECHO "$0: $CCUT2: compiled program failed to run correctly"
   $NEAT_RM_OUTS
