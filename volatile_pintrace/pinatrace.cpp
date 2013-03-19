@@ -117,6 +117,8 @@ public:
 
     ADDRINT get_addr() { return addr_; }
 
+    std::string get_name() { return name_; }
+
     size_t get_size() { return sz_; }
 
     VolElem *get_next() { return next_; }
@@ -315,6 +317,10 @@ static BOOL logging = FALSE;
 
 static BOOL enable_random_reads = FALSE;
 
+static std::string global_checksum_var = "global_checksum";
+
+static VolElem *checksum_elem;
+
 enum OUTPUT_MODE {
     M_CHECKSUM,
     M_SUMMARY,
@@ -328,6 +334,9 @@ KNOB<string> KnobInputFile(KNOB_MODE_WRITEONCE, "pintool",
 
 KNOB<string> KnobOutputMode(KNOB_MODE_WRITEONCE, "pintool",
     "output-mode", "checksum", "specify the dump mode [checksum|summary|verbose]");
+
+KNOB<string> KnobChecksumVar(KNOB_MODE_WRITEONCE, "pintool",
+    "checksum-var", "global_checksum", "specify the name of the global variable which holds the checksum value");
 
 KNOB<BOOL> KnobRandomRead(KNOB_MODE_WRITEONCE, "pintool",
     "random-read", "0", "feed a random values to a volatile read");
@@ -365,10 +374,10 @@ static unsigned long StrToLong(const char *s, int base)
 
 static BOOL EmptyLine(const std::string &line)
 {
-        if (line.empty())
-            return true;
-        size_t found = line.find_first_not_of("\t\n ");
-        return (found == string::npos);
+    if (line.empty())
+        return true;
+    size_t found = line.find_first_not_of("\t\n ");
+    return (found == string::npos);
 }
 
 static VolElem *ParseLine(const string &line)
@@ -422,10 +431,24 @@ static int InitVolTable(const string &fname)
         }
         elem = ParseLine(line);
         assert(elem);
+        if (!elem->get_name().compare(global_checksum_var)) {
+            checksum_elem = elem;
+            continue;
+        }
         AddVolElem(elem);
     }
     vols.close();
     return 0;
+}
+
+static void DumpCsmithChecksum()
+{
+    if (!checksum_elem)
+        return;
+
+    uint32_t checksum;
+    PIN_SafeCopy(&checksum, (char*)(checksum_elem->get_addr()), checksum_elem->get_size());
+    cout << "checksum = " << uppercase << hex << checksum << endl;
 }
 
 static void DumpVolTable()
@@ -611,6 +634,7 @@ VOID Image(IMG img, VOID * v)
 
 VOID Fini(INT32 code, VOID *v)
 {
+    DumpCsmithChecksum();
     DumpVolTable();
     FiniVolTable();
 }
@@ -631,6 +655,16 @@ static int SetOutputMode(const string &mode)
         return -1;
     }
     return 0;
+}
+
+static int SetChecksumVar(const string &name)
+{
+    if (name == "") {
+      cerr << "Invalid checksum var name!\n";
+      return -1;
+    }
+    global_checksum_var = name;
+    return 0; 
 }
 
 /* ===================================================================== */
@@ -654,6 +688,8 @@ int main(int argc, char *argv[])
     if (PIN_Init(argc, argv)) return Usage();
 
     if (SetOutputMode(KnobOutputMode.Value()))
+        return Usage();
+    if (SetChecksumVar(KnobChecksumVar.Value()))
         return Usage();
 
     enable_random_reads = KnobRandomRead.Value();
