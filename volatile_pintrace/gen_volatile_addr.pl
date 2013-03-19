@@ -63,6 +63,7 @@ sub process_addr_file($) {
   my $next_addr = 0;
   open INF, "<$addr_file" or die "cannot open $addr_file!";
   my $curr_addr = 0;
+  my $prev_name = "";
   while (my $line = <INF>) {
     chomp $line;
     next if ($line eq "Succeeded");
@@ -73,6 +74,10 @@ sub process_addr_file($) {
     }
     my $name = get_name($a[0]);
     my $addr = $name_to_addr{$name};
+    if ($prev_name ne $name) {
+      $curr_addr = 0;
+    }
+    $prev_name = $name;
     if (!defined($addr)) {
       # print "unknown name[$name]!\n";
       # return -1;
@@ -84,6 +89,7 @@ sub process_addr_file($) {
     my $bits_offset = $a[1];
     my $bits_size = $a[2];
     my $ptr_str = $a[3];
+    # print "$curr_addr, $ptr_str, $bits_offset, $bits_size\n";
     if (($bits_offset % 8) == 0) {
       my $sz;
       if (($bits_size % 8) == 0) {
@@ -102,7 +108,7 @@ sub process_addr_file($) {
     }
     else {
       my $tmp_addr = $addr + int(($bits_offset + $bits_size) / 8);
-      # print "$tmp_addr, $addr, $curr_addr\n";
+      # print "$tmp_addr, $addr, $curr_addr, $bits_offset, $bits_size\n";
       next if ($tmp_addr < $curr_addr);
       $curr_addr = $addr if (!$curr_addr);
       $addr = $curr_addr;
