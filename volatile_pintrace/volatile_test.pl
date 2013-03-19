@@ -30,7 +30,7 @@ my $RunSafely;
 
 ##########################################################
 # compilers under test
-my $COMPILER_COMMON_OPTS = "-w -DINLINE= -DCSMITH_MINIMAL -DWRAP_VOLATILES=0";
+my $COMPILER_COMMON_OPTS = "-w -DINLINE= -DCSMITH_MINIMAL -DWRAP_VOLATILES=0 -DNOT_PRINT_CHECKSUM";
 
 my @clang_opts = (
     "-O0 ",
