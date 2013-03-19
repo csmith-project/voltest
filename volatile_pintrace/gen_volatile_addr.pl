@@ -74,8 +74,12 @@ sub process_addr_file($) {
     my $name = get_name($a[0]);
     my $addr = $name_to_addr{$name};
     if (!defined($addr)) {
-      print "unknown name[$name]!\n";
-      return -1;
+      # print "unknown name[$name]!\n";
+      # return -1;
+      # it is possible that a var in the source code does not
+      # appear in nm's outout, e.g. compiler can optimize out
+      # an unused static global
+      next;
     }
     my $bits_offset = $a[1];
     my $bits_size = $a[2];
