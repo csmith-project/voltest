@@ -160,7 +160,7 @@ sub doit($$$) {
     print "failed to process address file!\n";
     goto out;
   }
-  my $global_checksum = "global_checksum";
+  my $global_checksum = "crc32_context";
   my $global_checksum_addr = $name_to_addr{$global_checksum};
   if (defined($global_checksum_addr)) {
     my $s = sprintf "$global_checksum; 0x%x; 4; non-pointer\n", $global_checksum_addr;

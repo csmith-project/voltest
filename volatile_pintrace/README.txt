@@ -89,7 +89,7 @@ Some details about pinatrace:
 
   * -checksum_var var_name
     pintool will read and dump the value of var_name, which is the checksum
-    value of a random program. The default var_name is `global_checksum'.
+    value of a random program. The default var_name is `crc32_context'.
 
 --------------------------------------------------------------------
 gen_volatile_addr.pl: invokes `nm' to generate actual volatile addresses 
