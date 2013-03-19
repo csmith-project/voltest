@@ -317,7 +317,7 @@ static BOOL logging = FALSE;
 
 static BOOL enable_random_reads = FALSE;
 
-static std::string global_checksum_var = "global_checksum";
+static std::string global_checksum_var = "crc32_context";
 
 static VolElem *checksum_elem;
 
@@ -336,7 +336,7 @@ KNOB<string> KnobOutputMode(KNOB_MODE_WRITEONCE, "pintool",
     "output-mode", "checksum", "specify the dump mode [checksum|summary|verbose]");
 
 KNOB<string> KnobChecksumVar(KNOB_MODE_WRITEONCE, "pintool",
-    "checksum-var", "global_checksum", "specify the name of the global variable which holds the checksum value");
+    "checksum-var", "crc32_context", "specify the name of the global variable which holds the checksum value");
 
 KNOB<BOOL> KnobRandomRead(KNOB_MODE_WRITEONCE, "pintool",
     "random-read", "0", "feed a random values to a volatile read");
@@ -446,8 +446,9 @@ static void DumpCsmithChecksum()
     if (!checksum_elem)
         return;
 
-    uint32_t checksum;
-    PIN_SafeCopy(&checksum, (char*)(checksum_elem->get_addr()), checksum_elem->get_size());
+    uint32_t value;
+    PIN_SafeCopy(&value, (char*)(checksum_elem->get_addr()), checksum_elem->get_size());
+    uint32_t checksum = value ^ 0xFFFFFFFFUL;
     cout << "checksum = " << uppercase << hex << checksum << endl;
 }
 
