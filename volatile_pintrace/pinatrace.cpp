@@ -278,8 +278,10 @@ VolElem::add_byte_values(ADDRINT addr, size_t sz, unsigned int mode)
 void VolElem::compute_checksum()
 {
     for(size_t i = 0; i < sz_; i++) {
-        Crc32(byte_read_counts_[i]);
-        Crc32(byte_write_counts_[i]);
+        if (byte_read_counts_[i] > 0)
+            Crc32(byte_read_counts_[i]);
+        if (byte_write_counts_[i] > 0)
+            Crc32(byte_write_counts_[i]);
     }
 }
 
