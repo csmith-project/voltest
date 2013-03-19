@@ -23,7 +23,7 @@
 CCUT1="gcc-4.4 -O0"
 CCUT2="gcc-4.4 -O2"
 
-CPPFLAGS="-DINLINE= -DCSMITH_MINIMAL -DWRAP_VOLATILES=0 -I/local/randtest/src/csmith/runtime"
+CPPFLAGS="-DINLINE= -DCSMITH_MINIMAL -DWRAP_VOLATILES=0 -DNOT_PRINT_CHECKSUM -I/local/randtest/src/csmith/runtime"
 
 # PIN_HOME: inherit this from the environment.
 
@@ -246,7 +246,7 @@ fi
 # compiler under test.
 ccut1_exe_vol_addrs=ccut1-exe-vol-addrs-out.txt
 
-$VOL_ADDR_GEN --address-file="$vol_vars" \
+$VOL_ADDR_GEN --vars-file="$vol_vars" \
   "$ccut1_exe" \
   > "$ccut1_exe_vol_addrs" 2>&1
 if [ $? -ne 0 ]; then
@@ -316,7 +316,7 @@ fi
 # compiler under test.
 ccut2_exe_vol_addrs=ccut2-exe-vol-addrs-out.txt
 
-$VOL_ADDR_GEN --address-file="$vol_vars" \
+$VOL_ADDR_GEN --vars-file="$vol_vars" \
   "$ccut2_exe" \
   > "$ccut2_exe_vol_addrs" 2>&1
 if [ $? -ne 0 ]; then
