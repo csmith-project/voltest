@@ -192,6 +192,9 @@ void CheckerManager::Finalize()
   Instance = NULL;
 }
 
+// Currently only check macro definitions and inclusion directives, 
+// which include #include, #import, #include_next and #include_macros.
+// If we need, will check on others such as #if, #pragma etc.
 bool CheckerManager::hasPPDirective(PreprocessingRecord &PPCallbacks,
                                     std::string &ErrorMsg)
 {
