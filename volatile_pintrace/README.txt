@@ -26,6 +26,8 @@ Volatile tests howto:
   * ./launchn.pl  or 
   
   * ./volatile_test.pl  (use ./volatile_test.pl --help to check its usage)
+  Note: if you want to disable volatile struct/union fields in random programs,
+        pass --no-vol-struct-union-fields to this driver script
 
 - test case reduction using creduce
   make sure preprocess the random program first, then do reduction
