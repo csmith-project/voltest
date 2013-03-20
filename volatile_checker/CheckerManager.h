@@ -12,6 +12,7 @@ class Checker;
 namespace clang {
   class CompilerInstance;
   class LangOptions;
+  class PreprocessingRecord;
 }
 
 class CheckerManager {
@@ -66,6 +67,9 @@ private:
   CheckerManager();
 
   ~CheckerManager();
+
+  bool hasPPDirective(clang::PreprocessingRecord &PPCallbacks,
+                      std::string &ErrorMsg);
 
   static CheckerManager *Instance;
 

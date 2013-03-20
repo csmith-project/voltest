@@ -192,8 +192,66 @@ void CheckerManager::Finalize()
   Instance = NULL;
 }
 
+bool CheckerManager::hasPPDirective(PreprocessingRecord &PPCallbacks,
+                                    std::string &ErrorMsg)
+{
+  ErrorMsg = "";
+  SourceManager &SrcMgr = ClangInstance->getSourceManager();
+  FileID FID = SrcMgr.getMainFileID();
+
+  for (PreprocessingRecord::iterator I = PPCallbacks.local_begin(), 
+       E = PPCallbacks.local_end(); I != E; ++I) {
+    const PreprocessedEntity *PE = (*I);
+    PreprocessedEntity::EntityKind K = PE->getKind();
+    if (K == PreprocessedEntity::MacroDefinitionKind) {
+      if (!PPCallbacks.isEntityInFileID(I, FID)) {
+        // llvm::outs() << MDName << "\n";
+        continue;
+      }
+      
+      const MacroDefinition *MD = dyn_cast<MacroDefinition>(PE);
+      std::string MDName = MD->getName()->getName();
+      ErrorMsg = "Has macro definition directive:" + MDName;
+      return true;
+    }
+    if (K == PreprocessedEntity::InclusionDirectiveKind) {
+      const InclusionDirective *IncDirective = 
+        dyn_cast<InclusionDirective>(PE);
+      std::string Str = "";
+      InclusionDirective::InclusionKind IncK = IncDirective->getKind();
+      switch (IncK) {
+      case InclusionDirective::Include:
+        Str = "#include";
+        break;
+      case InclusionDirective::Import:
+        Str = "#import";
+        break;
+      case InclusionDirective::IncludeNext:
+        Str = "#include_next";
+        break;
+      case InclusionDirective::IncludeMacros:
+        Str = "#__include_macros";
+        break;
+      default:
+        CheckerAssert(0 && "Unknown InclusionKind!"); 
+        return true;
+      }
+      Str += " ";
+      Str += IncDirective->getFileName();
+      ErrorMsg = "Has inclusion directive:" + Str;
+      return true; 
+    }
+  }
+  return false;
+}
+
 int CheckerManager::doChecking(std::string &ErrorMsg)
 {
+  Preprocessor &PP = ClangInstance->getPreprocessor();
+  PreprocessingRecord *PPCallbacks = 
+    new PreprocessingRecord(ClangInstance->getSourceManager(), true);
+  PP.addPPCallbacks(PPCallbacks);
+
   ClangInstance->createSema(TU_Complete, 0);
   ClangInstance->getDiagnostics().setSuppressAllDiagnostics(true);
 #if 0
@@ -207,10 +265,12 @@ int CheckerManager::doChecking(std::string &ErrorMsg)
   ParseAST(ClangInstance->getSema());
   ClangInstance->getDiagnosticClient().EndSourceFile();
 
-  int RV = -1;
-  if (CurrentCheckerImpl->isSuccess(ErrorMsg))
-    RV = 0;
-  return RV;
+  if (hasPPDirective(*PPCallbacks, ErrorMsg)) {
+    return -1;
+  }
+  if (!CurrentCheckerImpl->isSuccess(ErrorMsg))
+    return -1;
+  return 0;
 }
 
 bool CheckerManager::handleCheckerCmdOpt(const std::string &Arg)
