@@ -611,6 +611,7 @@ Usage: volatile_test.pl --work-dir=[dir] --pin-output-mode=[checksum|verbose|sum
   --enable-pin-random-read: enable pintool to inject random values to volatile reads
   --iteration=[num]: specify how many testing runs (default: 100000000)
   --disable-swarm: disable swarm options
+  --no-vol-struct-union-fields: disable struct/union fields
   --help: this message
 ';
 
@@ -744,6 +745,9 @@ sub main() {
       }
       elsif ($1 eq "enable-pin-random-read") {
         $PIN_RANDOM_READ = "-random_read";
+      }
+      elsif ($1 eq "no-vol-struct-union-fields") {
+        $CSMITH_VOL_OPTS .= "$1 ";
       }
       elsif ($1 eq "disable-swarm") {
         $USE_SWARM = 0;
