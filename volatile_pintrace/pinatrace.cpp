@@ -445,8 +445,10 @@ static int InitVolTable(const string &fname)
 
 static void DumpCsmithChecksum()
 {
-    if (!checksum_elem)
+    if (!checksum_elem) {
+        cout << "checksum = 0\n";
         return;
+    }
 
     uint32_t value;
     PIN_SafeCopy(&value, (char*)(checksum_elem->get_addr()), checksum_elem->get_size());
