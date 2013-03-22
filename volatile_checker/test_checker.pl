@@ -9,6 +9,11 @@ my %tests_dir = (
   "volatile_address_test_dir" => "volatile-address"
 );
 
+my %extra_opts = (
+  "volatile-reorder" => "",
+  "volatile-address" => "--all-vars-output=all_vars_addr.txt"
+);
+
 my @failed_tests;
 my $SAVE_TEMP = 0;
 
@@ -48,8 +53,9 @@ sub do_one_csmith_test($$$) {
     die "failed to run exe!";
   }
 
+  my $extra_opt = $extra_opts{$checker};
   die "preprocessing failed" if (runit("gcc -E -I$csmith_home/runtime $n.c > $n.preprocessed.c"));
-  my $checker_cmd = "../../volatile_checker --checker=$checker $n.preprocessed.c > $n.checker.out 2>&1";
+  my $checker_cmd = "../../volatile_checker --checker=$checker $extra_opt $n.preprocessed.c > $n.checker.out 2>&1";
   # print "$checker_cmd\n";
   die "checker failed!" if (runit($checker_cmd));
   print "iteration [$n] succeeded\n";
