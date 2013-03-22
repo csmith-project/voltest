@@ -612,6 +612,7 @@ Usage: volatile_test.pl --work-dir=[dir] --pin-output-mode=[checksum|verbose|sum
   --iteration=[num]: specify how many testing runs (default: 100000000)
   --disable-swarm: disable swarm options
   --no-vol-struct-union-fields: disable struct/union fields
+  --strict-volatile-rule: enable Csmith to generate programs with respect to one-vol-access-between-two-seq-points rule
   --help: this message
 ';
 
