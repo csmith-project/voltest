@@ -7,7 +7,9 @@ use Cwd;
 my $VERBOSE = 0;
 my $KEEP_TEMPS = 1;
 my $OUTPUT_FILE = "";
+my $ALL_VAR_ADDRS_OUTPUT = "all_global_var_addrs.txt";
 my %name_to_addr = ();
+my @all_vol_addrs = ();
 my @all_addrs = ();
 
 my $UNIT_TEST_DIR = "unittest";
@@ -57,8 +59,8 @@ sub get_name($) {
   return $str;
 }
 
-sub process_addr_file($) {
-  my ($addr_file) = @_;
+sub process_addr_file($$$) {
+  my ($addr_file, $addrs_array, $skip_pointer) = @_;
 
   my $next_addr = 0;
   open INF, "<$addr_file" or die "cannot open $addr_file!";
@@ -89,20 +91,23 @@ sub process_addr_file($) {
     my $bits_offset = $a[1];
     my $bits_size = $a[2];
     my $ptr_str = $a[3];
+    $ptr_str =~ s/[\s\t]//g;
+    next if ($skip_pointer && ($ptr_str eq "pointer"));
+
     # print "$curr_addr, $ptr_str, $bits_offset, $bits_size\n";
     if (($bits_offset % 8) == 0) {
       my $sz;
       if (($bits_size % 8) == 0) {
         $addr = $addr + $bits_offset / 8;
         $sz = $bits_size / 8;
-        my $s = sprintf "$a[0]; 0x%x; $sz;$ptr_str\n", $addr;
-        push @all_addrs, $s;
+        my $s = sprintf "$a[0]; 0x%x; $sz; $ptr_str\n", $addr;
+        push @$addrs_array, $s;
       }
       else {
         $addr = $addr + ($bits_offset / 8);
         $sz = int($bits_size / 8) + 1;
-        my $s = sprintf "$a[0]; 0x%x; $sz;$ptr_str\n", $addr;
-        push @all_addrs, $s;
+        my $s = sprintf "$a[0]; 0x%x; $sz; $ptr_str\n", $addr;
+        push @$addrs_array, $s;
       }
       $curr_addr = $addr + $sz;
     }
@@ -120,31 +125,40 @@ sub process_addr_file($) {
       }
       my $sz = $curr_addr - $addr;
       next if ($sz < 1);
-      my $s = sprintf "$a[0]; 0x%x; $sz;$ptr_str\n", $addr;
-      push @all_addrs, $s;
+      my $s = sprintf "$a[0]; 0x%x; $sz; $ptr_str\n", $addr;
+      push @$addrs_array, $s;
     }
   }
   close INF;
   return 0;
 }
 
-sub dump_result() {
+sub dump_result($) {
+  my ($all_addr_file) = @_;
+
   if ($OUTPUT_FILE ne "") {
     open OUT, "<$OUTPUT_FILE" or die "cannot open $OUTPUT_FILE!";
-    foreach my $s (@all_addrs) {
+    foreach my $s (@all_vol_addrs) {
       print OUT "$s";
     }
     close OUT;
   }
   else {
-    foreach my $s (@all_addrs) {
+    foreach my $s (@all_vol_addrs) {
       print "$s";
     }
   }
+
+  return if ($all_addr_file eq "");
+  open ALL_OUT, "<$ALL_VAR_ADDRS_OUTPUT" or die "cannot open $ALL_VAR_ADDRS_OUTPUT!";
+  foreach my $v (@all_addrs) {
+    print ALL_OUT "$v";
+  }
+  close ALL_OUT;
 }
 
-sub doit($$$) {
-  my ($addr_file, $exec, $for_unit_test) = @_;
+sub doit($$$$) {
+  my ($addr_file, $all_addr_file, $exec, $for_unit_test) = @_;
 
   my $cmd;
   my $res;
@@ -161,19 +175,27 @@ sub doit($$$) {
     print "failed to process nm output!\n";
     goto out;
   }
-  $res = process_addr_file($addr_file);
+  $res = process_addr_file($addr_file, \@all_vol_addrs, 0);
   if ($res) {
     print "failed to process address file!\n";
     goto out;
   }
+  if ($all_addr_file ne "") {
+    $res = process_addr_file($all_addr_file, \@all_addrs, 1);
+  }
+
+  # the pintool will read crc32_context from all_addr_output,
+  # then we don't need to fake it as a volatile now
+=comment
   my $global_checksum = "crc32_context";
   my $global_checksum_addr = $name_to_addr{$global_checksum};
   if (defined($global_checksum_addr)) {
     my $s = sprintf "$global_checksum; 0x%x; 4; non-pointer\n", $global_checksum_addr;
-    push @all_addrs, $s;
+    push @all_vol_addrs, $s;
   }
+=cut
 
-  dump_result() if (!$for_unit_test);
+  dump_result($all_addr_file) if (!$for_unit_test);
 out:
   return $res if ($for_unit_test);
   if (!$KEEP_TEMPS) {
@@ -187,7 +209,7 @@ sub do_one_unit_test($$$) {
   my ($cfile, $ref_out, $regenerate) = @_;
 
   %name_to_addr = ();
-  @all_addrs = ();
+  @all_vol_addrs = ();
   my $checker = "../../volatile_checker/volatile_checker --checker=volatile-address";
   my $checker_out = "checker.out";
   my $exec = "tmp_test.out";
@@ -196,10 +218,10 @@ sub do_one_unit_test($$$) {
   return -1 if (runit($cmd));
   $cmd = "gcc $cfile -o tmp_test.out";
   return -1 if (runit($cmd));
-  return -1 if (doit($checker_out, $exec, 1));
+  return -1 if (doit($checker_out, "", $exec, 1));
   if ($regenerate) {
     open OUT, ">$ref_out" or die "cannot open $ref_out";
-    foreach my $s (@all_addrs) {
+    foreach my $s (@all_vol_addrs) {
       print OUT "$s";
     }
     close OUT;
@@ -213,7 +235,7 @@ sub do_one_unit_test($$$) {
   open INF, "<$ref_out" or die "cannot open $ref_out";
   while (my $line = <INF>) {
     chomp $line;
-    my $new_str = $all_addrs[$i];
+    my $new_str = $all_vol_addrs[$i];
     goto fail unless (defined($new_str));
     my @ref_a = split(';', $line);
     my @new_a = split(';', $new_str);
@@ -246,7 +268,7 @@ sub do_one_unit_test($$$) {
       goto fail if (($ref_addr - $curr_ref_base) != ($new_addr - $curr_new_base));
     }
   }
-  goto fail if ($i != @all_addrs);
+  goto fail if ($i != @all_vol_addrs);
   close INF;
   return 0;
 
@@ -293,10 +315,11 @@ sub do_unit_test($) {
 ###################################################
 
 my $help_msg = '
-gen_volatile_addr.pl --vars-file=<file> exec
+gen_volatile_addr.pl --vars-file=<file> [--all-vars-file=<file>] exec
   where:
   exec: executable
-  --vars-file=<file>: vars file generated by volatile_checker
+  --vars-file=<file>: volatile vars file generated by volatile_checker
+  --all-vars-file=<file>: all vars (including both volatiles and non-volatiles) file generated by volatile_checker
   --not-keep-temps: do not keep the temp files
   --verbose: print verbose message
   --output=<file>: where to dump the generated result [default: stdout]
@@ -315,6 +338,7 @@ sub main() {
   my $opt;
   my @unused = ();
   my $addr_file;
+  my $all_addr_file = "";
   my $test = 0;
   my $regenerate = 0;
 
@@ -325,6 +349,12 @@ sub main() {
       }
       elsif ($1 eq "vars-file") {
         $addr_file = $2;
+      }
+      elsif ($1 eq "all-vars-file") {
+        $all_addr_file = $2;
+      }
+      elsif ($1 eq "all-var-addrs-output") {
+        $ALL_VAR_ADDRS_OUTPUT = $2;
       }
       else {
         die_on_invalid_opt($opt); 
@@ -370,7 +400,7 @@ sub main() {
     die_on_invalid_opt("Multiple inputs!");
   }
 
-  doit($addr_file, $unused[0], 0);
+  doit($addr_file, $all_addr_file, $unused[0], 0);
 }
 
 main();
