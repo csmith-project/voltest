@@ -751,6 +751,9 @@ sub main() {
       elsif ($1 eq "no-vol-struct-union-fields") {
         $CSMITH_VOL_OPTS .= "$1 ";
       }
+      elsif ($1 eq "strict-volatile-rule") {
+        $CSMITH_VOL_OPTS .= "$1 ";
+      }
       elsif ($1 eq "disable-swarm") {
         $USE_SWARM = 0;
       }
