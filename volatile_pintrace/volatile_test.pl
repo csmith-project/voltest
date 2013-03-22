@@ -649,7 +649,7 @@ sub check_prereqs() {
   print_msg("succeeded\n");
 
   print_msg("checking RunSafely...\n");
-  $RunSafely = "$cwd/RunSafely";
+  $RunSafely = "RunSafely";
   my $res = runit("$RunSafely 10 1 /dev/null ls_output.txt ls");
   die "failed: is $RunSafely in the PATH env?" if ($res);
   print_msg("succeeded\n");
@@ -667,7 +667,7 @@ sub check_prereqs() {
   print_msg("succeeded: $CHECKER\n");
 
   print_msg("checking gen_volatile_addr.pl...\n");
-  $GEN_VOLATILE_ADDR = "$cwd/gen_volatile_addr.pl";
+  $GEN_VOLATILE_ADDR = "gen_volatile_addr.pl";
   if (runit("$GEN_VOLATILE_ADDR --help > /dev/null 2>&1")) {
     die "failed to run $GEN_VOLATILE_ADDR!";
   }
