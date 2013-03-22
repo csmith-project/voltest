@@ -212,6 +212,35 @@ fi
 
 ###############################################################################
 
+## Use Clang's address sanitizer to weed out "broken" programs.
+
+asan_exe=clang-asan-out.exe
+asan_out=clang-asan-out.txt
+
+$CLANG -O0 -fsanitize=address $CPPFLAGS \
+  "$filename" \
+  -o "$asan_exe" \
+  > "$asan_out" 2>&1
+if [ $? -ne 0 ]; then
+  $QUIET_ECHO "$0: clang -fsanitize=address could not compile \"$filename\""
+  $NEAT_RM_OUTS
+  exit 1
+fi
+
+# The output of the program produced by clang -fsanitize=address.
+asan_exe_out=clang-asan-exe-out.txt
+
+$RUNSAFELY $TIMEOUT 1 /dev/null "$asan_exe_out" \
+"$asan_exe" \
+  > /dev/null 2>&1
+if [ $? -ne 0 ]; then
+  $QUIET_ECHO "$0: clang -fsanitize=address: program is unsanitary"
+  $NEAT_RM_OUTS
+  exit 1
+fi
+
+###############################################################################
+
 ## Extract information about the volatiles in the program.
 
 vol_vars=vol-vars-out.txt
