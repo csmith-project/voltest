@@ -35,7 +35,10 @@ public:
   VolatileAddressChecker(const char *CheckerName, const char *Desc)
     : Checker(CheckerName, Desc),
       AccessOnceVarMode(ACC_VARS_ALL),
-      OutFile("")
+      OutFile(""),
+      AllVarsOutFile(""),
+      DumpAllVars(false),
+      UnionLevelCount(0)
   { }
 
   ~VolatileAddressChecker();
@@ -73,10 +76,21 @@ private:
                                uint64_t Offset,
                                const clang::DeclaratorDecl *DD);
 
+  bool addOneAddress(bool IsVol,
+                     const std::string &Name,
+                     uint64_t Offset,
+                     uint64_t Sz,
+                     const std::string &PtrStr);
+
   void addOneVolatileAddress(const std::string &Name,
                              uint64_t Offset,
                              uint64_t Sz,
                              const std::string &PtrStr);
+
+  void addOneNonVolatileAddress(const std::string &Name,
+                                uint64_t Offset,
+                                uint64_t Sz,
+                                const std::string &PtrStr);
 
   std::string getPointerStr(const clang::QualType &QT);
 
@@ -84,17 +98,35 @@ private:
 
   bool setOutput(const std::string &OutFile);
 
-  void dumpAddresses(llvm::raw_ostream &OS);
+  bool setAllVarsOutput(const std::string &OutFile) {
+    AllVarsOutFile = OutFile;
+    DumpAllVars = true;
+    return true;
+  }
+
+  void dumpAddresses(const std::vector<std::string> &Addrs, 
+                     llvm::raw_ostream &OS);
+
+  void dumpAddrsToFile(const std::vector<std::string> &Addrs,
+                       const std::string &FN);
 
   VarSet AccessOnceVars;
 
   VarSet VisitedVars;
 
-  std::vector<std::string> AllAddrs;
+  std::vector<std::string> AllVolAddrs;
+
+  std::vector<std::string> AllNonVolAddrs;
 
   ACC_VAR_MODE AccessOnceVarMode;
 
   std::string OutFile;
+
+  std::string AllVarsOutFile;
+
+  bool DumpAllVars;
+
+  int UnionLevelCount;
 
   // Unimplemented
   VolatileAddressChecker();

@@ -57,7 +57,7 @@ bool VolatileAddressVisitor::VisitVarDecl(VarDecl *VD)
   if (VD->hasLocalStorage())
     return true;
 
-  ConsumerInstance->handleOneVarDecl(VD->getCanonicalDecl());
+  ConsumerInstance->handleOneVarDecl(VD);
   return true;
 }
  
@@ -83,25 +83,59 @@ void VolatileAddressChecker::HandleTranslationUnit(ASTContext &Ctx)
     CheckerAssert(0 && "Fatal error during checing!");
   }
 
-  if (OutFile == "") {
-    dumpAddresses(llvm::outs());
-  }
-  else {
-    std::string Err;
-    llvm::raw_fd_ostream *Out =
-      new llvm::raw_fd_ostream(OutFile.c_str(), Err);
-    CheckerAssert(Err.empty() && "Cannot open output file!");
-    dumpAddresses(*Out);
-    delete Out;
+  if (DumpAllVars)
+    dumpAddrsToFile(AllNonVolAddrs, AllVarsOutFile);
+
+  if (OutFile == "")
+    dumpAddresses(AllVolAddrs, llvm::outs());
+  else
+    dumpAddrsToFile(AllVolAddrs, OutFile);
+}
+
+void VolatileAddressChecker::dumpAddrsToFile(const std::vector<std::string> &Addrs,
+                                             const std::string &FN)
+{
+  std::string Err;
+  llvm::raw_fd_ostream *Out =
+    new llvm::raw_fd_ostream(FN.c_str(), Err);
+  CheckerAssert(Err.empty() && "Cannot open output file!");
+  dumpAddresses(Addrs, *Out);
+  delete Out;
+}
+                                             
+void VolatileAddressChecker::dumpAddresses(const std::vector<std::string> &Addrs,
+                                           llvm::raw_ostream &OS)
+{
+  for (std::vector<std::string>::const_iterator I = Addrs.begin(), 
+       E = Addrs.end(); I != E; ++I) {
+    OS << (*I);
   }
 }
 
-void VolatileAddressChecker::dumpAddresses(llvm::raw_ostream &OS)
+bool VolatileAddressChecker::addOneAddress(bool IsVol,
+                                           const std::string &Name,
+                                           uint64_t Offset,
+                                           uint64_t Sz,
+                                           const std::string &PtrStr)
 {
-  for (std::vector<std::string>::iterator I = AllAddrs.begin(), 
-       E = AllAddrs.end(); I != E; ++I) {
-    OS << (*I);
+  CheckerAssert((UnionLevelCount >= 0) && "Invalid UnionLevelCount!");
+
+  std::stringstream SS;
+  SS << Name << "; ";
+  SS << Offset << "; ";
+  SS << Sz << "; ";
+  SS << PtrStr << "\n";
+  if (DumpAllVars) 
+    AllNonVolAddrs.push_back(SS.str());
+  // TODO: omit volatile unions for now 
+  if (UnionLevelCount > 0)
+    return true;
+
+  if (IsVol) {
+    AllVolAddrs.push_back(SS.str());
+    return true;
   }
+  return false;
 }
 
 void VolatileAddressChecker::addOneVolatileAddress(const std::string &Name,
@@ -109,19 +143,67 @@ void VolatileAddressChecker::addOneVolatileAddress(const std::string &Name,
                                                    uint64_t Sz,
                                                    const std::string &PtrStr)
 {
+  // TODO: omit volatile unions for now
+  if (UnionLevelCount > 0)
+    return;
+
   std::stringstream SS;
   SS << Name << "; ";
   SS << Offset << "; ";
   SS << Sz << "; ";
   SS << PtrStr << "\n";
-  AllAddrs.push_back(SS.str());
+  AllVolAddrs.push_back(SS.str());
 }
 
 void VolatileAddressChecker::handleOneUnion(const std::string &Prefix,
                                             uint64_t Offset,
                                             const RecordDecl *RD)
 {
-  // TODO
+  if (!RD->getDefinition())
+    return;
+
+  const ASTRecordLayout &Info = Context->getASTRecordLayout(RD);
+  unsigned Count = Info.getFieldCount(); (void)Count;
+  uint64_t MaxSz = 0;
+  const FieldDecl *MaxFD = NULL;
+
+  for (RecordDecl::field_iterator I = RD->field_begin(), E = RD->field_end();
+       I != E; ++I) {
+    const FieldDecl *FD = (*I);
+    uint64_t FieldSz;
+    if (FD->isBitField())
+      FieldSz = FD->getBitWidthValue(*Context);
+    else 
+      FieldSz = Context->getTypeSize(FD->getType());
+    
+    if (FieldSz > MaxSz) {
+      MaxSz = FieldSz;
+      MaxFD = FD;
+    }
+  }
+  if (!MaxFD || !MaxSz)
+    return;
+  
+  QualType QT = MaxFD->getType();
+  // TODO: skip volatile for now;
+  if (QT.isVolatileQualified())
+    return;
+
+  if (MaxFD->isBitField()) {
+    addOneAddress(QT.isVolatileQualified(),
+                  Prefix + MaxFD->getNameAsString(),
+                  Offset,
+                  MaxSz,
+                  "non-pointer");
+  }
+  else {
+    UnionLevelCount++;
+    handleOneDeclaratorDecl(Prefix,
+                            Offset,
+                            MaxFD);
+    UnionLevelCount--;
+    CheckerAssert((UnionLevelCount >= 0) && "Bad UnionLevelCount");
+  }
 }
 
 void VolatileAddressChecker::handleOneStructure(const std::string &Prefix,
@@ -142,17 +224,17 @@ void VolatileAddressChecker::handleOneStructure(const std::string &Prefix,
     uint64_t Field_Off = Offset + Info.getFieldOffset(Idx);
 
     if (FD->isBitField()) {
-      QualType QT = FD->getType();
-      if (!QT.isVolatileQualified())
-        continue;
       uint64_t Field_Sz = FD->getBitWidthValue(*Context);
       // omit zero-sz bitfield
       if (!Field_Sz)
         continue;
-      addOneVolatileAddress(Prefix + FD->getNameAsString(),
-                            Field_Off,
-                            Field_Sz,
-                            "non-pointer");
+
+      QualType QT = FD->getType();
+      addOneAddress(QT.isVolatileQualified(),
+                    Prefix + FD->getNameAsString(),
+                    Field_Off,
+                    Field_Sz,
+                    "non-pointer");
     }
     else {
       handleOneDeclaratorDecl(Prefix,
@@ -198,11 +280,11 @@ void VolatileAddressChecker::handleOneDeclaratorDecl(const std::string &Prefix,
 {
   QualType QT = DD->getType();
 
-  if (QT.isVolatileQualified()) {
-    addOneVolatileAddress(Prefix + DD->getNameAsString(),
-                          Offset,
-                          Context->getTypeSize(QT),
-                          getPointerStr(QT));
+  if (addOneAddress(QT.isVolatileQualified(),
+                    Prefix + DD->getNameAsString(),
+                    Offset,
+                    Context->getTypeSize(QT),
+                    getPointerStr(QT))) {
     return;
   }
 
@@ -226,18 +308,22 @@ void VolatileAddressChecker::handleOneDeclaratorDecl(const std::string &Prefix,
 
 void VolatileAddressChecker::handleOneVarDecl(const VarDecl *VD)
 {
-  if (VisitedVars.count(VD))
+  if (!VD->isThisDeclarationADefinition())
     return;
-  VisitedVars.insert(VD);
+
+  const VarDecl *CanonicalVD = VD->getCanonicalDecl();
+  if (VisitedVars.count(CanonicalVD))
+    return;
+  VisitedVars.insert(CanonicalVD);
 
   if ((AccessOnceVarMode == ACC_VARS_NONE) &&
-      AccessOnceVars.count(VD))
+      AccessOnceVars.count(CanonicalVD))
     return;
   if ((AccessOnceVarMode == ACC_VARS_ONLY) &&
-      !AccessOnceVars.count(VD))
+      !AccessOnceVars.count(CanonicalVD))
     return;
 
-  if (AccessOnceVars.count(VD)) {
+  if (AccessOnceVars.count(CanonicalVD)) {
     QualType QT = VD->getType();
     addOneVolatileAddress(VD->getNameAsString(),
                           0,
@@ -297,6 +383,8 @@ void VolatileAddressChecker::printCmdOpts()
   llvm::outs() <<           "through ACCESS_ONCE macro\n";
   llvm::outs() << "  --address-output=<filename>\n";
   llvm::outs() << "    specifies where to output the result [default:stdout]\n";
+  llvm::outs() << "  --all-vars-output=<filename>\n";
+  llvm::outs() << "    specifies where to output the addresses/offsets of all vars\n";
 }
 
 bool VolatileAddressChecker::setAccessOnceVarMode(const std::string &ModeStr)
@@ -335,6 +423,9 @@ bool VolatileAddressChecker::handleValueCmdOpt(const std::string &ArgStr,
   }
   else if (!ArgName.compare("address-output")) {
     return setOutput(ArgValue);
+  }
+  else if (!ArgName.compare("all-vars-output")) {
+    return setAllVarsOutput(ArgValue);
   }
   else {
     return false;
