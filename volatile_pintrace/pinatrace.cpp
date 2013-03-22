@@ -260,8 +260,9 @@ VolElem::add_byte_values(ADDRINT addr, size_t sz, unsigned int mode)
         start_pos = 0;
     }
 
+    // cout << hex << "r: addr: 0x" << addr << ", size: " << sz << ", start_pos: " << start_pos << ", sz_: " << sz_ << endl;
     for(size_t i = start_pos; i < sz; i++) {
-        if (i >= sz_)
+        if ((i - start_pos) >= sz_)
             break;
 
         ostringstream ss;
