@@ -48,6 +48,8 @@ END_LEGAL */
 #define READ_MODE 2
 
 /* checksum computation from CSmith */
+static uint32_t vol_crc32_tab[256];
+static uint32_t vol_crc32_context = 0xFFFFFFFFUL;
 static uint32_t crc32_tab[256];
 static uint32_t crc32_context = 0xFFFFFFFFUL;
 static uint64_t seed;
@@ -66,7 +68,7 @@ static uint64_t GenRand(void)
   return lrand48();
 }
 
-static void Crc32Gentab (void)
+static void Crc32Gentab (uint32_t *tab)
 {
     uint32_t crc;
     const uint32_t poly = 0xEDB88320UL;
@@ -81,32 +83,33 @@ static void Crc32Gentab (void)
                 crc >>= 1;
             }
         }
-        crc32_tab[i] = crc;
+        tab[i] = crc;
     }
 }
 
-static void Crc32Byte (uint8_t b)
+static void Crc32Byte (uint8_t b, uint32_t *context, uint32_t *tab)
 {
-    crc32_context =
-        ((crc32_context >> 8) & 0x00FFFFFF) ^
-        crc32_tab[(crc32_context ^ b) & 0xFF];
+    uint32_t tmp_context = 
+        ((*context >> 8) & 0x00FFFFFF) ^
+        tab[(*context ^ b) & 0xFF];
+    *context = tmp_context;
 }
 
-static void Crc32(uint64_t val)
+static void Crc32(uint64_t val, uint32_t *context, uint32_t *tab)
 {
-    Crc32Byte ((val>>0) & 0xff);
-    Crc32Byte ((val>>8) & 0xff);
-    Crc32Byte ((val>>16) & 0xff);
-    Crc32Byte ((val>>24) & 0xff);
-    Crc32Byte ((val>>32) & 0xff);
-    Crc32Byte ((val>>40) & 0xff);
-    Crc32Byte ((val>>48) & 0xff);
-    Crc32Byte ((val>>56) & 0xff);
+    Crc32Byte ((val>>0) & 0xff, context, tab);
+    Crc32Byte ((val>>8) & 0xff, context, tab);
+    Crc32Byte ((val>>16) & 0xff, context, tab);
+    Crc32Byte ((val>>24) & 0xff, context, tab);
+    Crc32Byte ((val>>32) & 0xff, context, tab);
+    Crc32Byte ((val>>40) & 0xff, context, tab);
+    Crc32Byte ((val>>48) & 0xff, context, tab);
+    Crc32Byte ((val>>56) & 0xff, context, tab);
 }
 
 static void DumpChecksum()
 {
-    cout << "vol_access_checksum = " << uppercase << hex << (crc32_context ^ 0xFFFFFFFFUL) << "\n";
+    cout << "vol_access_checksum = " << uppercase << hex << (vol_crc32_context ^ 0xFFFFFFFFUL) << "\n";
 }
 
 class VolElem {
@@ -115,11 +118,11 @@ public:
         
     ~VolElem(void);
 
-    ADDRINT get_addr() { return addr_; }
+    ADDRINT get_addr() const { return addr_; }
 
-    std::string get_name() { return name_; }
+    std::string get_name() const { return name_; }
 
-    size_t get_size() { return sz_; }
+    size_t get_size() const { return sz_; }
 
     VolElem *get_next() { return next_; }
 
@@ -280,9 +283,9 @@ void VolElem::compute_checksum()
 {
     for(size_t i = 0; i < sz_; i++) {
         if (byte_read_counts_[i] > 0)
-            Crc32(byte_read_counts_[i]);
+            Crc32(byte_read_counts_[i], &vol_crc32_context, vol_crc32_tab);
         if (byte_write_counts_[i] > 0)
-            Crc32(byte_write_counts_[i]);
+            Crc32(byte_write_counts_[i], &vol_crc32_context, vol_crc32_tab);
     }
 }
 
@@ -322,8 +325,6 @@ static BOOL enable_random_reads = FALSE;
 
 static std::string global_checksum_var = "crc32_context";
 
-static VolElem *checksum_elem;
-
 enum OUTPUT_MODE {
     M_CHECKSUM,
     M_SUMMARY,
@@ -334,6 +335,9 @@ static enum OUTPUT_MODE output_mode = M_CHECKSUM;
 
 KNOB<string> KnobInputFile(KNOB_MODE_WRITEONCE, "pintool",
     "vol-input", "", "specify input file which contains volatile addresses");
+
+KNOB<string> KnobAllVarInputFile(KNOB_MODE_WRITEONCE, "pintool",
+    "all-vars-input", "", "specify input file which contains all var addresses");
 
 KNOB<string> KnobOutputMode(KNOB_MODE_WRITEONCE, "pintool",
     "output-mode", "checksum", "specify the dump mode [checksum|summary|verbose]");
@@ -434,25 +438,69 @@ static int InitVolTable(const string &fname)
         }
         elem = ParseLine(line);
         assert(elem);
-        if (!elem->get_name().compare(global_checksum_var)) {
-            checksum_elem = elem;
-            continue;
-        }
         AddVolElem(elem);
     }
     vols.close();
     return 0;
 }
 
-static void DumpCsmithChecksum()
+static void ComputeCsmithChecksum(const VolElem *elem)
 {
-    if (!checksum_elem)
-        return;
+    assert(elem && "Bad Elem!");
+    ADDRINT addr = elem->get_addr();
 
-    uint32_t value;
-    PIN_SafeCopy(&value, (char*)(checksum_elem->get_addr()), checksum_elem->get_size());
-    uint32_t checksum = value ^ 0xFFFFFFFFUL;
-    cout << "checksum = " << uppercase << hex << checksum << endl;
+    for (size_t i = 0; i < elem->get_size(); i++) {
+        unsigned int value = 0;
+
+        PIN_SafeCopy(&value, (char*)(addr+i), 1);
+        Crc32(value, &crc32_context, crc32_tab);
+    }
+}
+
+static int DumpCsmithChecksum()
+{
+    const string &fname = KnobAllVarInputFile.Value();
+    if (fname.empty()) {
+        cerr << "Invalid all-vars-input name: " << fname << endl;
+        return -1;
+    }
+
+    ifstream vars_f(fname.c_str());
+    if (!vars_f.is_open()) {
+        cerr << "Can't open all-vars-input file: " << fname << endl;
+        return -1;
+    }
+
+    Crc32Gentab(crc32_tab);
+    VolElem *checksum_elem = NULL;
+    string line;
+    while(!vars_f.eof()) {
+        VolElem *elem = NULL;
+        getline(vars_f, line);
+        if (EmptyLine(line)) {
+            continue;
+        }
+        elem = ParseLine(line);
+        assert(elem);
+        if (!elem->get_name().compare(global_checksum_var)) {
+            checksum_elem = elem;
+            break;
+        }
+        ComputeCsmithChecksum(elem);
+    }
+    vars_f.close();
+
+    if (checksum_elem) {
+        uint32_t value;
+        PIN_SafeCopy(&value, (char*)(checksum_elem->get_addr()), checksum_elem->get_size());
+        uint32_t checksum = value ^ 0xFFFFFFFFUL;
+        cout << "checksum = " << uppercase << hex << checksum << "\n";
+        delete checksum_elem;
+    }
+    else {
+        cout << "checksum = " << uppercase << hex << (crc32_context ^ 0xFFFFFFFFUL) << "\n";
+    }
+    return 0;
 }
 
 static void DumpVolTable()
@@ -460,7 +508,7 @@ static void DumpVolTable()
     VolElem *elem = vol_head;
 
     if (output_mode == M_CHECKSUM)
-        Crc32Gentab();
+        Crc32Gentab(vol_crc32_tab);
 
     while(elem) {
         switch (output_mode) {
@@ -638,7 +686,10 @@ VOID Image(IMG img, VOID * v)
 
 VOID Fini(INT32 code, VOID *v)
 {
-    DumpCsmithChecksum();
+    if (DumpCsmithChecksum()) {
+      FiniVolTable();
+      exit(-1);
+    }
     DumpVolTable();
     FiniVolTable();
 }
