@@ -456,8 +456,7 @@ static int DumpCsmithChecksum()
 {
     const string &fname = KnobAllVarInputFile.Value();
     if (fname.empty()) {
-        cerr << "Invalid all-vars-input name: " << fname << endl;
-        return -1;
+        return 0;
     }
 
     ifstream vars_f(fname.c_str());
