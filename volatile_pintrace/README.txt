@@ -89,9 +89,9 @@ Some details about pinatrace:
   * -seed num  
     pintool will use the passed seed rather than a random one
 
-  * -checksum_var var_name
-    pintool will read and dump the value of var_name, which is the checksum
-    value of a random program. The default var_name is `crc32_context'.
+  * -all_vars_input <all_vars_addr_file.txt>
+    if this options is given, the pintool will read all memory values based on the
+    given addr file, and compute value checksums.
 
 --------------------------------------------------------------------
 gen_volatile_addr.pl: invokes `nm' to generate actual volatile addresses 
