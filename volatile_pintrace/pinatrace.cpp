@@ -323,8 +323,6 @@ static BOOL logging = FALSE;
 
 static BOOL enable_random_reads = FALSE;
 
-static std::string global_checksum_var = "crc32_context";
-
 enum OUTPUT_MODE {
     M_CHECKSUM,
     M_SUMMARY,
@@ -341,9 +339,6 @@ KNOB<string> KnobAllVarInputFile(KNOB_MODE_WRITEONCE, "pintool",
 
 KNOB<string> KnobOutputMode(KNOB_MODE_WRITEONCE, "pintool",
     "output-mode", "checksum", "specify the dump mode [checksum|summary|verbose]");
-
-KNOB<string> KnobChecksumVar(KNOB_MODE_WRITEONCE, "pintool",
-    "checksum-var", "crc32_context", "specify the name of the global variable which holds the checksum value");
 
 KNOB<BOOL> KnobRandomRead(KNOB_MODE_WRITEONCE, "pintool",
     "random-read", "0", "feed a random values to a volatile read");
@@ -472,7 +467,6 @@ static int DumpCsmithChecksum()
     }
 
     Crc32Gentab(crc32_tab);
-    VolElem *checksum_elem = NULL;
     string line;
     while(!vars_f.eof()) {
         VolElem *elem = NULL;
@@ -482,24 +476,11 @@ static int DumpCsmithChecksum()
         }
         elem = ParseLine(line);
         assert(elem);
-        if (!elem->get_name().compare(global_checksum_var)) {
-            checksum_elem = elem;
-            break;
-        }
         ComputeCsmithChecksum(elem);
     }
     vars_f.close();
 
-    if (checksum_elem) {
-        uint32_t value;
-        PIN_SafeCopy(&value, (char*)(checksum_elem->get_addr()), checksum_elem->get_size());
-        uint32_t checksum = value ^ 0xFFFFFFFFUL;
-        cout << "checksum = " << uppercase << hex << checksum << "\n";
-        delete checksum_elem;
-    }
-    else {
-        cout << "checksum = " << uppercase << hex << (crc32_context ^ 0xFFFFFFFFUL) << "\n";
-    }
+    cout << "checksum = " << uppercase << hex << (crc32_context ^ 0xFFFFFFFFUL) << "\n";
     return 0;
 }
 
@@ -712,16 +693,6 @@ static int SetOutputMode(const string &mode)
     return 0;
 }
 
-static int SetChecksumVar(const string &name)
-{
-    if (name == "") {
-      cerr << "Invalid checksum var name!\n";
-      return -1;
-    }
-    global_checksum_var = name;
-    return 0; 
-}
-
 /* ===================================================================== */
 /* Print Help Message                                                    */
 /* ===================================================================== */
@@ -743,8 +714,6 @@ int main(int argc, char *argv[])
     if (PIN_Init(argc, argv)) return Usage();
 
     if (SetOutputMode(KnobOutputMode.Value()))
-        return Usage();
-    if (SetChecksumVar(KnobChecksumVar.Value()))
         return Usage();
 
     enable_random_reads = KnobRandomRead.Value();
