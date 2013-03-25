@@ -225,7 +225,7 @@ sub run_csmith($$) {
   }
 
   # for checking pre-reqs
-  return if (!$redirect_output);
+  return 0 if (!$redirect_output);
 
   my $filesize = stat("$cfile")->size;
   print "$cfile is $filesize bytes\n";
