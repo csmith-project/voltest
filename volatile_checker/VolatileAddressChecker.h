@@ -76,7 +76,7 @@ private:
                                uint64_t Offset,
                                const clang::DeclaratorDecl *DD);
 
-  bool addOneAddress(bool IsVol,
+  void addOneAddress(bool IsVol,
                      const std::string &Name,
                      uint64_t Offset,
                      uint64_t Sz,

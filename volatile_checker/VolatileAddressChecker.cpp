@@ -112,7 +112,7 @@ void VolatileAddressChecker::dumpAddresses(const std::vector<std::string> &Addrs
   }
 }
 
-bool VolatileAddressChecker::addOneAddress(bool IsVol,
+void VolatileAddressChecker::addOneAddress(bool IsVol,
                                            const std::string &Name,
                                            uint64_t Offset,
                                            uint64_t Sz,
@@ -129,13 +129,11 @@ bool VolatileAddressChecker::addOneAddress(bool IsVol,
     AllNonVolAddrs.push_back(SS.str());
   // TODO: omit volatile unions for now 
   if (UnionLevelCount > 0)
-    return true;
+    return;
 
   if (IsVol) {
     AllVolAddrs.push_back(SS.str());
-    return true;
   }
-  return false;
 }
 
 void VolatileAddressChecker::addOneVolatileAddress(const std::string &Name,
@@ -279,12 +277,14 @@ void VolatileAddressChecker::handleOneDeclaratorDecl(const std::string &Prefix,
                                                const DeclaratorDecl *DD)
 {
   QualType QT = DD->getType();
+  bool IsVol = QT.isVolatileQualified();
 
-  if (addOneAddress(QT.isVolatileQualified(),
-                    Prefix + DD->getNameAsString(),
-                    Offset,
-                    Context->getTypeSize(QT),
-                    getPointerStr(QT))) {
+  if (IsVol) {
+    addOneAddress(IsVol,
+                  Prefix + DD->getNameAsString(),
+                  Offset,
+                  Context->getTypeSize(QT),
+                  getPointerStr(QT));
     return;
   }
 
@@ -303,7 +303,15 @@ void VolatileAddressChecker::handleOneDeclaratorDecl(const std::string &Prefix,
 
   if (const ArrayType *AT = Context->getAsArrayType(QT)) {
     handleOneArray(Prefix + DD->getNameAsString() + "+", Offset, AT);
+    return;
   }
+
+  CheckerAssert(!IsVol && "No volatile var here!");
+  addOneAddress(IsVol,
+                Prefix + DD->getNameAsString(),
+                Offset,
+                Context->getTypeSize(QT),
+                getPointerStr(QT));
 }
 
 void VolatileAddressChecker::handleOneVarDecl(const VarDecl *VD)
