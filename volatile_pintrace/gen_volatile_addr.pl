@@ -137,7 +137,7 @@ sub dump_result($) {
   my ($all_addr_file) = @_;
 
   if ($OUTPUT_FILE ne "") {
-    open OUT, "<$OUTPUT_FILE" or die "cannot open $OUTPUT_FILE!";
+    open OUT, ">$OUTPUT_FILE" or die "cannot open $OUTPUT_FILE!";
     foreach my $s (@all_vol_addrs) {
       print OUT "$s";
     }
@@ -150,7 +150,7 @@ sub dump_result($) {
   }
 
   return if ($all_addr_file eq "");
-  open ALL_OUT, "<$ALL_VAR_ADDRS_OUTPUT" or die "cannot open $ALL_VAR_ADDRS_OUTPUT!";
+  open ALL_OUT, ">$ALL_VAR_ADDRS_OUTPUT" or die "cannot open $ALL_VAR_ADDRS_OUTPUT!";
   foreach my $v (@all_addrs) {
     print ALL_OUT "$v";
   }
