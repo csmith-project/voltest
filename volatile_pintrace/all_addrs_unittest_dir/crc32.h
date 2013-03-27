@@ -55,6 +55,7 @@ static void crc32(uint64_t val, size_t sz)
   for (i = 0; i < sz; i++) {
     uint32_t tmp_v = 0;
     memcpy(&tmp_v, (char*)((char*)(&val) + i), 1);
+    /* printf("value = %u\n", tmp_v); */
     crc32_8bytes(tmp_v);
   }
 }
