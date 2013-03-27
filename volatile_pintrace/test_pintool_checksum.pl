@@ -269,7 +269,7 @@ sub do_one_test($$$) {
 
 out:
   chdir "..";
-  system "rm -rf $dir";
+  system "rm -rf $dir" unless ($for_unittest && $res);
   return $res;
 }
 

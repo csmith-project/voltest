@@ -51,7 +51,7 @@ crc32_8bytes (uint64_t val)
 static void crc32(uint64_t val, size_t sz)
 {
   size_t i;
-  assert((sz <= 8) && "Invalid sz!");
+  /* assert((sz <= 8) && "Invalid sz!"); */
   for (i = 0; i < sz; i++) {
     uint32_t tmp_v = 0;
     memcpy(&tmp_v, (char*)((char*)(&val) + i), 1);
