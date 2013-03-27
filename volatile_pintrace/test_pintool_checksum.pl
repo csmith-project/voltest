@@ -189,6 +189,7 @@ sub filter_globals($) {
   open INF, "<$fname" or die "cannot open $fname!";
   while (my $line = <INF>) {
     chomp $line;
+    $line =~ s/[(\s\t]//g;
     if ($line =~ m/^g_/) {
       $s .= "$line\n";
     }
