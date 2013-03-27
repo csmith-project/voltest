@@ -200,6 +200,33 @@ sub filter_globals($) {
   close OUT;
 }
 
+sub do_one_compiler($$$$$$) {
+  my ($compiler, $root, $cfile, $checker_out, $all_vars_out, $for_unittest) = @_;
+
+  my $res;
+  my $exe = "$root.$compiler.out";
+  die "compile_cfile failed!" if (($res = compile_cfile($compiler, "-O0", $cfile, $exe, 1, $for_unittest)) != 0);
+
+  die "gen_volatile_addr.pl failed!" if runit("$GEN_VOLATILE_ADDR --vars-file=$checker_out --all-vars-file=$all_vars_out --all-var-addrs-output=$PIN_ALL_ADDRS_FILE $exe > $PIN_ADDR_FILE 2>&1");
+  filter_globals($PIN_ALL_ADDRS_FILE);
+
+  my $raw_out = "$exe.raw-out";
+  die "run exe failed!" if (($res = run_exe_with_pin($exe, $compiler, $raw_out)) != 0);
+  if (-f "$PIN_ADDR_FILE") {
+    system ("mv $PIN_ADDR_FILE ${exe}_vol_addr.txt");
+  }
+  else {
+    die "No addr file!";
+  }
+  if (-f "$PIN_ALL_ADDRS_FILE") {
+    system ("mv $PIN_ALL_ADDRS_FILE ${exe}_all_var_addrs.txt");
+  }
+  my ($pin_checksum, $vol_str) = parse_output($raw_out);
+  die "Invalid checksum" unless (defined($pin_checksum));
+  die "Invalid vol_str" unless (defined($vol_str));
+  return $pin_checksum;
+}
+
 sub do_one_test($$$) {
   my ($n, $for_unittest, $root) = @_;
 
@@ -233,7 +260,7 @@ sub do_one_test($$$) {
   }
 
   my $normal_exe = "$root.normal.gcc.out";
-  die "cannot compile cfile!" if (($res = compile_cfile("gcc", "-O0", $cfile, $normal_exe, 0, $for_unittest)) != 0);
+  goto out if (($res = compile_cfile("gcc", "-O0", $cfile, $normal_exe, 0, $for_unittest)) != 0);
   my $normal_raw_out = "$normal_exe.raw-out";
   goto out if (($res = run_exe($normal_exe, "gcc", $normal_raw_out)) != 0);
   my ($normal_checksum, undef) = parse_output($normal_raw_out);
@@ -243,30 +270,16 @@ sub do_one_test($$$) {
   my $all_vars_out = "$root.checker.all.vars.out";
   die "checker failed!" if (($res = run_checker($root, $checker_out, $all_vars_out, $for_unittest)) != 0);
   
-  my $exe = "$root.gcc.out";
-  goto out if (($res = compile_cfile("gcc", "-O0", $cfile, $exe, 1, $for_unittest)) != 0);
-
-  die "gen_volatile_addr.pl failed!" if runit("$GEN_VOLATILE_ADDR --vars-file=$checker_out --all-vars-file=$all_vars_out --all-var-addrs-output=$PIN_ALL_ADDRS_FILE $exe > $PIN_ADDR_FILE 2>&1");
-  filter_globals($PIN_ALL_ADDRS_FILE);
-
-  my $raw_out = "$exe.raw-out";
-  die "run exe failed!" if (($res = run_exe_with_pin($exe, "gcc", $raw_out)) != 0);
-  if (-f "$PIN_ADDR_FILE") {
-    system ("mv $PIN_ADDR_FILE ${exe}_vol_addr.txt");
+  my $gcc_checksum = do_one_compiler("gcc", $root, $cfile, $checker_out, $all_vars_out, $for_unittest);
+  if ($for_unittest) {
+    die "unmatched checksums[$normal_checksum, $gcc_checksum]!" unless ($gcc_checksum eq $normal_checksum);
+    print_msg("checksum matched: [$normal_checksum, $gcc_checksum] ");
   }
   else {
-    die "No addr file!";
+    my $clang_checksum = do_one_compiler("clang", $root, $cfile, $checker_out, $all_vars_out, $for_unittest);
+    die "unmatched checksums[$gcc_checksum, $clang_checksum]!" unless ($gcc_checksum eq $clang_checksum);
+    print_msg("checksum matched: [$gcc_checksum, $clang_checksum] ");
   }
-  if (-f "$PIN_ALL_ADDRS_FILE") {
-    system ("mv $PIN_ALL_ADDRS_FILE ${exe}_all_var_addrs.txt");
-  }
-
-  my ($pin_checksum, $vol_str) = parse_output($raw_out);
-  die "Invalid checksum" unless (defined($pin_checksum));
-  die "Invalid vol_str" unless (defined($vol_str));
-
-  die "unmatched checksums[$normal_checksum, $pin_checksum]!" unless ($pin_checksum eq $normal_checksum);
-  print_msg("checksum matched: [$normal_checksum, $pin_checksum] ");
 
 out:
   chdir "..";
