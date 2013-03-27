@@ -448,6 +448,7 @@ static void ComputeCsmithChecksum(const VolElem *elem)
         unsigned int value = 0;
 
         PIN_SafeCopy(&value, (char*)(addr+i), 1);
+        // cout << "pintool value: " << value << "\n";
         Crc32(value, &crc32_context, crc32_tab);
     }
 }
