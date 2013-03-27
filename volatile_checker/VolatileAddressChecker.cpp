@@ -254,8 +254,14 @@ void VolatileAddressChecker::handleOneArray(const std::string &Prefix,
   const Type *ElemTy = Context->getBaseElementType(T).getTypePtr();
   const RecordType *ST = ElemTy->getAsStructureType();
   const RecordType *UT = ElemTy->getAsUnionType();
-  if (!ST && !UT)
+  if (!ST && !UT) {
+    if (!DumpAllVars)
+      return;
+    addOneAddress(false, Prefix, Offset,
+                  Context->getTypeSize(T), 
+                  getPointerStr(Context->getBaseElementType(T)));
     return;
+  }
 
   uint64_t Count = Context->getConstantArrayElementCount(T);
   for (uint64_t I = 0; I < Count; ++I) {
