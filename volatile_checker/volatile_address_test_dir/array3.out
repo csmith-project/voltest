@@ -1,9 +1,9 @@
-(g1+0).f1; 0; 32; non-pointer
-(g1+1).f1; 32; 32; non-pointer
-(g2+0).f1; 0; 32; non-pointer
-(g2+1).f1; 32; 32; non-pointer
-(g3+0).f1; 0; 32; non-pointer
-(g3+1).f1; 32; 32; non-pointer
-(g3+2).f1; 64; 32; non-pointer
-(g3+3).f1; 96; 32; non-pointer
+(g1+0).f1; 0; 32; non-pointer; non-bitfield
+(g1+1).f1; 32; 32; non-pointer; non-bitfield
+(g2+0).f1; 0; 32; non-pointer; non-bitfield
+(g2+1).f1; 32; 32; non-pointer; non-bitfield
+(g3+0).f1; 0; 32; non-pointer; non-bitfield
+(g3+1).f1; 32; 32; non-pointer; non-bitfield
+(g3+2).f1; 64; 32; non-pointer; non-bitfield
+(g3+3).f1; 96; 32; non-pointer; non-bitfield
 Succeeded
