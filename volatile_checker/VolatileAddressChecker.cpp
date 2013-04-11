@@ -155,7 +155,8 @@ void VolatileAddressChecker::addOneVolatileAddress(const std::string &Name,
   SS << Name << "; ";
   SS << Offset << "; ";
   SS << Sz << "; ";
-  SS << PtrStr << "\n";
+  SS << PtrStr << "; ";
+  SS << "non-bitfield" << "\n";
   AllVolAddrs.push_back(SS.str());
 }
 
@@ -349,6 +350,8 @@ void VolatileAddressChecker::handleOneVarDecl(const VarDecl *VD)
 
   if (AccessOnceVars.count(CanonicalVD)) {
     QualType QT = VD->getType();
+    // ISSUE: we may also need to consider a struct var
+    // where the struct has bit-fields.
     addOneVolatileAddress(VD->getNameAsString(),
                           0,
                           Context->getTypeSize(QT),
