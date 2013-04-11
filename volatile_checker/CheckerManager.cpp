@@ -214,6 +214,10 @@ bool CheckerManager::hasPPDirective(PreprocessingRecord &PPCallbacks,
       
       const MacroDefinition *MD = dyn_cast<MacroDefinition>(PE);
       std::string MDName = MD->getName()->getName();
+      // skip ACCESS_ONCE macro
+      if (MDName == "ACCESS_ONCE")
+        continue;
+
       ErrorMsg = "Has macro definition directive:" + MDName;
       return true;
     }
