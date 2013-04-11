@@ -77,6 +77,7 @@ private:
                                const clang::DeclaratorDecl *DD);
 
   void addOneAddress(bool IsVol,
+                     bool IsBitField,
                      const std::string &Name,
                      uint64_t Offset,
                      uint64_t Sz,

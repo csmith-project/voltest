@@ -113,6 +113,7 @@ void VolatileAddressChecker::dumpAddresses(const std::vector<std::string> &Addrs
 }
 
 void VolatileAddressChecker::addOneAddress(bool IsVol,
+                                           bool IsBitField,
                                            const std::string &Name,
                                            uint64_t Offset,
                                            uint64_t Sz,
@@ -124,7 +125,12 @@ void VolatileAddressChecker::addOneAddress(bool IsVol,
   SS << Name << "; ";
   SS << Offset << "; ";
   SS << Sz << "; ";
-  SS << PtrStr << "\n";
+  SS << PtrStr << "; ";
+  if (IsBitField)
+    SS << "bitfield\n";
+  else
+    SS << "non-bitfield\n";
+
   if (DumpAllVars) 
     AllNonVolAddrs.push_back(SS.str());
   // TODO: omit volatile unions for now 
@@ -189,6 +195,7 @@ void VolatileAddressChecker::handleOneUnion(const std::string &Prefix,
 
   if (MaxFD->isBitField()) {
     addOneAddress(QT.isVolatileQualified(),
+                  true,
                   Prefix + MaxFD->getNameAsString(),
                   Offset,
                   MaxSz,
@@ -229,6 +236,7 @@ void VolatileAddressChecker::handleOneStructure(const std::string &Prefix,
 
       QualType QT = FD->getType();
       addOneAddress(QT.isVolatileQualified(),
+                    true,
                     Prefix + FD->getNameAsString(),
                     Field_Off,
                     Field_Sz,
@@ -257,7 +265,7 @@ void VolatileAddressChecker::handleOneArray(const std::string &Prefix,
   if (!ST && !UT) {
     if (!DumpAllVars)
       return;
-    addOneAddress(false, Prefix, Offset,
+    addOneAddress(false, false, Prefix, Offset,
                   Context->getTypeSize(T), 
                   getPointerStr(Context->getBaseElementType(T)));
     return;
@@ -287,6 +295,7 @@ void VolatileAddressChecker::handleOneDeclaratorDecl(const std::string &Prefix,
 
   if (IsVol) {
     addOneAddress(IsVol,
+                  false,
                   Prefix + DD->getNameAsString(),
                   Offset,
                   Context->getTypeSize(QT),
@@ -314,6 +323,7 @@ void VolatileAddressChecker::handleOneDeclaratorDecl(const std::string &Prefix,
 
   CheckerAssert(!IsVol && "No volatile var here!");
   addOneAddress(IsVol,
+                false,
                 Prefix + DD->getNameAsString(),
                 Offset,
                 Context->getTypeSize(QT),
