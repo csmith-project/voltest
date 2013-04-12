@@ -59,76 +59,175 @@ sub get_name($) {
   return $str;
 }
 
+sub get_mask_str($) {
+  my $bin_str = @_;;
+  my $hex_str = sprintf("%x", oct("0b$bin_str"));
+  return $hex_str;
+}
+
+sub check_remaining_bits($$$$) {
+  my ($prev_full_name_ref, $prev_addr_ref, $bits_mask, $addrs_array) = @_;
+
+  return if ($$bits_mask eq "00000000"); 
+
+  die "bad prev_addr!" if ($$prev_addr_ref == 0);
+  my $mask_str = get_mask_str($$bits_mask);
+  my $s = sprintf "$$prev_full_name_ref; 0x%x; 1; non-pointer; bitfield; $mask_str\n", $$prev_addr_ref;
+  push @$addrs_array, $s;
+  $$prev_addr_ref = 0;
+  $$prev_full_name_ref = "";
+  $$bits_mask = "00000000";
+}
+
+sub set_bits($$$) {
+  my ($mask, $from, $sz) = @_;
+  
+  return if ($sz == 0);
+
+  my $to = $from + $sz;
+  die "bad set bits: from[$from], sz[$sz]!" if ($to > 8);
+  my $s = "";
+  $s =~ s/^(.*)/'1' x $sz/e;
+  substr($$mask, $from, $sz, $s);
+}
+
 sub process_addr_file($$$) {
   my ($addr_file, $addrs_array, $skip_pointer) = @_;
 
   my $next_addr = 0;
   open INF, "<$addr_file" or die "cannot open $addr_file!";
-  my $curr_addr = 0;
+  my $prev_addr = 0;
+  my $prev_offset = 0;
+  my $prev_full_name = "";
   my $prev_name = "";
+  my $bits_mask = "00000000";
+
   while (my $line = <INF>) {
     chomp $line;
     next if ($line eq "Succeeded");
     my @a = split(';', $line);
-    if (@a != 4) {
+    if (@a != 5) {
       print "Invalid line:$line\n";
       return -1;
     }
     my $name = get_name($a[0]);
-    my $addr = $name_to_addr{$name};
     if ($prev_name ne $name) {
-      $curr_addr = 0;
+      $prev_addr = 0;
+      $prev_offset = 0;
+      $bits_mask = "00000000";
+      $prev_full_name = "";
     }
     $prev_name = $name;
+
+    my $addr = $name_to_addr{$name};
     if (!defined($addr)) {
       # print "unknown name[$name]!\n";
       # return -1;
       # it is possible that a var in the source code does not
       # appear in nm's outout, e.g. compiler can optimize out
       # an unused static global
+      check_remaining_bits(\$prev_full_name, \$prev_addr, \$bits_mask, $addrs_array);
       next;
     }
     my $bits_offset = $a[1];
     my $bits_size = $a[2];
     my $ptr_str = $a[3];
     $ptr_str =~ s/[\s\t]//g;
-    next if ($skip_pointer && ($ptr_str eq "pointer"));
+    if ($skip_pointer && ($ptr_str eq "pointer")) {
+      check_remaining_bits(\$prev_full_name, \$prev_addr, \$bits_mask, $addrs_array);
+      next;
+    }
+
+    my $sz = 0;
+    my $bitfield_str = $a[4];
+    $bitfield_str =~ s/[\s\t]//g;
+    if ($bitfield_str eq "non-bitfield") {
+      check_remaining_bits(\$prev_full_name, \$prev_addr, \$bits_mask, $addrs_array);
+      die "bad bits_offset:$bits_offset!" unless (($bits_offset % 8) == 0);
+      die "bad bits_sz:$bits_size!" unless (($bits_size % 8) == 0);
+      my $f_addr = $addr + $bits_offset / 8;
+      $sz = int($bits_size / 8);
+      my $s = sprintf "$a[0]; 0x%x; $sz; $ptr_str; $bitfield_str; 0\n", $f_addr;
+      push @$addrs_array, $s;
+      next;
+    }
 
     # print "$curr_addr, $ptr_str, $bits_offset, $bits_size\n";
     if (($bits_offset % 8) == 0) {
-      my $sz;
-      if (($bits_size % 8) == 0) {
-        $addr = $addr + $bits_offset / 8;
+      check_remaining_bits(\$prev_full_name, \$prev_addr, \$bits_mask, $addrs_array);
+      my $f_addr = $addr + ($bits_offset / 8);
+
+      my $remaining_bits = $bits_size % 8;
+      if ($remaining_bits == 0) {
         $sz = $bits_size / 8;
-        my $s = sprintf "$a[0]; 0x%x; $sz; $ptr_str\n", $addr;
+        my $s = sprintf "$a[0]; 0x%x; $sz; $ptr_str; $bitfield_str; 0\n", $f_addr;
         push @$addrs_array, $s;
+        $prev_offset = $bits_offset + $bits_size;
       }
       else {
-        $addr = $addr + ($bits_offset / 8);
-        $sz = int($bits_size / 8) + 1;
-        my $s = sprintf "$a[0]; 0x%x; $sz; $ptr_str\n", $addr;
+        $prev_full_name = $a[0];
+        $prev_addr = $addr + int(($bits_offset + $bits_size) / 8);
+        set_bits(\$bits_mask, 0, $remaining_bits);
+        if ($bits_size < 8) {
+          next;
+        }
+
+        $sz = int($bits_size / 8);
+        my $s = sprintf "$a[0]; 0x%x; $sz; $ptr_str; $bitfield_str; 0\n", $f_addr;
         push @$addrs_array, $s;
+        $prev_offset = $bits_offset + $sz * 8;
       }
-      $curr_addr = $addr + $sz;
     }
     else {
-      my $tmp_addr = $addr + int(($bits_offset + $bits_size) / 8);
-      # print "$tmp_addr, $addr, $curr_addr, $bits_offset, $bits_size\n";
-      next if ($tmp_addr < $curr_addr);
-      $curr_addr = $addr if (!$curr_addr);
-      $addr = $curr_addr;
-      if (($bits_offset + $bits_size) % 8) {
-        $curr_addr = $tmp_addr + 1;
+      # my $tmp_bits_size = $remaining_bits + $bits_size;
+      if ($prev_offset == 0) {
+        $prev_offset = 8 * (int($bits_offset/8));
       }
       else {
-        $curr_addr = $tmp_addr;
+        die "bad offsets: bits_offset[$bits_offset], prev_offset[$prev_offset]" if
+          ($prev_offset >= $bits_offset);
       }
-      my $sz = $curr_addr - $addr;
-      next if ($sz < 1);
-      my $s = sprintf "$a[0]; 0x%x; $sz; $ptr_str\n", $addr;
+
+      $prev_full_name = $a[0] if ($prev_full_name eq "");
+      my $rel_off = $bits_offset - $prev_offset;
+      if (($rel_off + $bits_size) < 8) {
+        set_bits(\$bits_mask, $rel_off, $bits_size);
+        next;
+      }
+      set_bits(\$bits_mask, $rel_off, 8-$rel_off);
+      if ($prev_addr == 0) {
+        $prev_addr = $addr + int($bits_offset/8);
+      }
+      check_remaining_bits(\$prev_full_name, \$prev_addr, \$bits_mask, $addrs_array);
+
+      my $new_offset = 8 * (int($bits_offset/8)) + 8;
+      my $new_bits_sz = $bits_size - ($new_offset - $bits_offset);
+      $prev_offset = $new_offset;
+      die "bad new_bits_sz[$new_bits_sz]!" if ($new_bits_sz < 0);
+      next if ($new_bits_sz == 0);
+
+      my $f_addr = $addr + ($bits_offset / 8) + 1;
+      if ($prev_full_name eq "") {
+        $prev_full_name = $a[0];
+      }
+      my $sz = int($new_bits_sz) / 8;
+      my $s = sprintf "$prev_full_name; 0x%x; $sz; $ptr_str; $bitfield_str; 0\n", $f_addr;
       push @$addrs_array, $s;
+
+      my $remaining_bits = $new_bits_sz % 8;
+      $prev_addr = $addr + int(($new_offset + $new_bits_sz) / 8);
+      $prev_offset = 8 * int(($new_offset + $new_bits_sz) / 8);
+      if (($remaining_bits % 8) != 0) {
+        $bits_mask = "00000000";
+        set_bits(\$bits_mask, 0, $remaining_bits);
+        $prev_full_name = $a[0];
+      }
+      else {
+        $prev_full_name = "";
+      }
     }
   }
+  check_remaining_bits(\$prev_full_name, \$prev_addr, \$bits_mask, $addrs_array);
   close INF;
   return 0;
 }
@@ -239,7 +338,7 @@ sub do_one_unit_test($$$) {
     goto fail unless (defined($new_str));
     my @ref_a = split(';', $line);
     my @new_a = split(';', $new_str);
-    goto fail if ((@ref_a != 4) || (@new_a != 4));
+    goto fail if ((@ref_a != 6) || (@new_a != 6));
     goto fail if ($ref_a[0] ne $new_a[0]);
     goto fail if ($ref_a[2] != $new_a[2]);
     my $ref_ptr = $ref_a[3];
@@ -247,6 +346,19 @@ sub do_one_unit_test($$$) {
     $ref_ptr =~ s/\s//g;
     $new_ptr =~ s/\s//g;
     goto fail if ($ref_ptr ne $new_ptr);
+
+    my $ref_bitfield = $ref_a[4];
+    my $new_bitfield = $new_a[4];
+    $ref_bitfield =~ s/\s//g;
+    $new_bitfield =~ s/\s//g;
+    goto fail if ($ref_bitfield ne $new_bitfield);
+
+    my $ref_bitoff = $ref_a[5];
+    my $new_bitoff = $new_a[5];
+    $ref_bitoff =~ s/\s//g;
+    $new_bitoff =~ s/\s//g;
+    goto fail if ($ref_bitoff ne $new_bitoff);
+
     my $ref_name = get_name($ref_a[0]);
     my $new_name = get_name($ref_a[0]);
     goto fail if ($ref_name ne $new_name);
@@ -305,6 +417,7 @@ sub do_unit_test($) {
     print "  [$test]...";
     if (do_one_unit_test($test, $ref_out, $regenerate)) {
       print "FAILED!\n";
+      die "Yang";;
     }
     else {
       print "SUCCEEDED!\n";
