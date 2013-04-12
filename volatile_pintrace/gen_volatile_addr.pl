@@ -60,7 +60,8 @@ sub get_name($) {
 }
 
 sub get_mask_str($) {
-  my $bin_str = @_;;
+  my ($bin_str) = @_;
+
   my $hex_str = sprintf("%x", oct("0b$bin_str"));
   return $hex_str;
 }
@@ -72,7 +73,9 @@ sub check_remaining_bits($$$$) {
 
   die "bad prev_addr!" if ($$prev_addr_ref == 0);
   my $mask_str = get_mask_str($$bits_mask);
+  # print "check: mask_str: $$bits_mask, str:$mask_str\n";
   my $s = sprintf "$$prev_full_name_ref; 0x%x; 1; non-pointer; bitfield; $mask_str\n", $$prev_addr_ref;
+  # print "check_remaining_bits: $s\n";
   push @$addrs_array, $s;
   $$prev_addr_ref = 0;
   $$prev_full_name_ref = "";
@@ -89,6 +92,7 @@ sub set_bits($$$) {
   my $s = "";
   $s =~ s/^(.*)/'1' x $sz/e;
   substr($$mask, $from, $sz, $s);
+  # print "$$mask, " . get_mask_str($$mask) . "\n";
 }
 
 sub process_addr_file($$$) {
@@ -179,7 +183,6 @@ sub process_addr_file($$$) {
       }
     }
     else {
-      # my $tmp_bits_size = $remaining_bits + $bits_size;
       if ($prev_offset == 0) {
         $prev_offset = 8 * (int($bits_offset/8));
       }
@@ -206,17 +209,26 @@ sub process_addr_file($$$) {
       die "bad new_bits_sz[$new_bits_sz]!" if ($new_bits_sz < 0);
       next if ($new_bits_sz == 0);
 
+      my $remaining_bits = $new_bits_sz % 8;
+      $prev_addr = $addr + int(($new_offset + $new_bits_sz) / 8);
+      $prev_offset = 8 * int(($new_offset + $new_bits_sz) / 8);
+
+      if ($new_bits_sz < 8) {
+        die "bad remaining_bits:$remaining_bits!" if ($remaining_bits == 0);
+        $bits_mask = "00000000";
+        set_bits(\$bits_mask, 0, $remaining_bits);
+        $prev_full_name = $a[0];
+        next;
+      }
+
       my $f_addr = $addr + ($bits_offset / 8) + 1;
       if ($prev_full_name eq "") {
         $prev_full_name = $a[0];
       }
-      my $sz = int($new_bits_sz) / 8;
+      $sz = int($new_bits_sz / 8);
       my $s = sprintf "$prev_full_name; 0x%x; $sz; $ptr_str; $bitfield_str; 0\n", $f_addr;
       push @$addrs_array, $s;
 
-      my $remaining_bits = $new_bits_sz % 8;
-      $prev_addr = $addr + int(($new_offset + $new_bits_sz) / 8);
-      $prev_offset = 8 * int(($new_offset + $new_bits_sz) / 8);
       if (($remaining_bits % 8) != 0) {
         $bits_mask = "00000000";
         set_bits(\$bits_mask, 0, $remaining_bits);
