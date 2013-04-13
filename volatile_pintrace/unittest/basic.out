@@ -1,3 +1,3 @@
-g1; 0x402068; 4; non-pointer
-g2; 0x40206c; 4; non-pointer
-g3; 0x402040; 40; non-pointer
+g1; 0x402068; 4; non-pointer; non-bitfield
+g2; 0x40206c; 4; non-pointer; non-bitfield
+g3; 0x402040; 40; non-pointer; non-bitfield
