@@ -114,7 +114,7 @@ static void DumpChecksum()
 
 class VolElem {
 public:
-    VolElem(const string &name, ADDRINT addr, size_t sz_, BOOL is_pointer);
+    VolElem(const string &name, ADDRINT addr, size_t sz_, uint8_t mask, BOOL is_pointer);
         
     ~VolElem(void);
 
@@ -125,6 +125,8 @@ public:
     size_t get_size() const { return sz_; }
 
     VolElem *get_next() { return next_; }
+
+    uint8_t get_bits_mask(void) const { return bits_mask_; }
 
     BOOL is_pointer() { return is_pointer_; }
 
@@ -164,6 +166,8 @@ private:
 
     const size_t sz_;
 
+    const uint8_t bits_mask_;
+
     BOOL is_pointer_;
 
     VolElem *next_;
@@ -182,10 +186,11 @@ private:
     VolElem &operator=(const VolElem &v);
 };
 
-VolElem::VolElem(const string &name, ADDRINT addr, size_t sz, BOOL is_pointer)
+VolElem::VolElem(const string &name, ADDRINT addr, size_t sz, uint8_t mask, BOOL is_pointer)
     : name_(name),
       addr_(addr),
       sz_(sz),
+      bits_mask_(mask),
       is_pointer_(is_pointer),
       next_(NULL),
       byte_write_counts_(sz, 0),
@@ -272,6 +277,9 @@ VolElem::add_byte_values(ADDRINT addr, size_t sz, unsigned int mode)
         unsigned int value = 0;
 
         PIN_SafeCopy(&value, (char*)(addr+i), 1);
+        if ((sz_ == 1) && bits_mask_) {
+          value &= bits_mask_;
+        }
         ss << "name:" << name_ << ", ";
         ss << m << " addr: " << hex << (addr+i) << ", ";
         ss << "value: " << hex << value << endl;
@@ -386,7 +394,8 @@ static VolElem *ParseLine(const string &line)
 {
     vector<string> tuple;
     SplitString(line, tuple, ';');
-    assert(tuple.size() == 4);
+    size_t tuple_size = tuple.size();
+    assert((tuple_size == 4) || (tuple_size == 5));
     
     ADDRINT addr = StrToLong(tuple[1].c_str(), 16);
     size_t size = StrToLong(tuple[2].c_str(), 10);
@@ -403,7 +412,15 @@ static VolElem *ParseLine(const string &line)
     else {
         assert(0 && "bad type!");
     }
-    VolElem *elem = new VolElem(tuple[0], addr, size, is_pointer);
+
+    VolElem *elem;
+    if (tuple_size == 4) {
+        elem = new VolElem(tuple[0], addr, size, 0, is_pointer);
+        return elem;
+    }
+
+    uint8_t mask = (uint8_t)(StrToLong(tuple[4].c_str(), 16));
+    elem = new VolElem(tuple[0], addr, size, mask, is_pointer);
     return elem;
 }
 
@@ -444,10 +461,16 @@ static void ComputeCsmithChecksum(const VolElem *elem)
     assert(elem && "Bad Elem!");
     ADDRINT addr = elem->get_addr();
 
-    for (size_t i = 0; i < elem->get_size(); i++) {
+    size_t sz = elem->get_size();
+    uint8_t mask = elem->get_bits_mask();
+    // cout << "pintool name: " << elem->get_name() << "\n";
+    for (size_t i = 0; i < sz; i++) {
         unsigned int value = 0;
 
         PIN_SafeCopy(&value, (char*)(addr+i), 1);
+        if ((sz == 1) && mask) {
+          value &= mask;
+        }
         // cout << "pintool value: " << value << "\n";
         Crc32(value, &crc32_context, crc32_tab);
     }
