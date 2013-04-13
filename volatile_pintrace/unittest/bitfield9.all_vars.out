@@ -1,0 +1,3 @@
+g_5; 0x402028; 4; non-pointer; non-bitfield
+g_7; 0x40202c; 4; non-pointer; non-bitfield
+g_403.; 0x402030; 1; non-pointer; bitfield; c0
