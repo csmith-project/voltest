@@ -74,7 +74,7 @@ sub check_remaining_bits($$$$) {
   die "bad prev_addr:$$prev_full_name_ref, $$bits_mask!" if ($$prev_addr_ref == 0);
   my $mask_str = get_mask_str($$bits_mask);
   # print "check: mask_str: $$bits_mask, str:$mask_str\n";
-  my $s = sprintf "$$prev_full_name_ref; 0x%x; 1; non-pointer; bitfield; $mask_str\n", $$prev_addr_ref;
+  my $s = sprintf "$$prev_full_name_ref; 0x%x; 1; non-pointer; $mask_str\n", $$prev_addr_ref;
   # print "check_remaining_bits: $s\n";
   push @$addrs_array, $s;
   $$prev_addr_ref = 0;
@@ -152,7 +152,7 @@ sub process_addr_file($$$) {
       die "bad bits_sz:$bits_size!" unless (($bits_size % 8) == 0);
       my $f_addr = $addr + $bits_offset / 8;
       $sz = int($bits_size / 8);
-      my $s = sprintf "$a[0]; 0x%x; $sz; $ptr_str; $bitfield_str\n", $f_addr;
+      my $s = sprintf "$a[0]; 0x%x; $sz; $ptr_str\n", $f_addr;
       push @$addrs_array, $s;
       next;
     }
@@ -165,7 +165,7 @@ sub process_addr_file($$$) {
       my $remaining_bits = $bits_size % 8;
       if ($remaining_bits == 0) {
         $sz = $bits_size / 8;
-        my $s = sprintf "$a[0]; 0x%x; $sz; $ptr_str; $bitfield_str\n", $f_addr;
+        my $s = sprintf "$a[0]; 0x%x; $sz; $ptr_str\n", $f_addr;
         push @$addrs_array, $s;
         $prev_offset = $bits_offset + $bits_size;
       }
@@ -178,7 +178,7 @@ sub process_addr_file($$$) {
         }
 
         $sz = int($bits_size / 8);
-        my $s = sprintf "$a[0]; 0x%x; $sz; $ptr_str; $bitfield_str\n", $f_addr;
+        my $s = sprintf "$a[0]; 0x%x; $sz; $ptr_str\n", $f_addr;
         push @$addrs_array, $s;
         $prev_offset = $bits_offset + $sz * 8;
       }
@@ -228,7 +228,7 @@ sub process_addr_file($$$) {
         $prev_full_name = $a[0];
       }
       $sz = int($new_bits_sz / 8);
-      my $s = sprintf "$prev_full_name; 0x%x; $sz; $ptr_str; $bitfield_str\n", $f_addr;
+      my $s = sprintf "$prev_full_name; 0x%x; $sz; $ptr_str\n", $f_addr;
       push @$addrs_array, $s;
 
       if (($remaining_bits % 8) != 0) {
@@ -343,8 +343,8 @@ sub unittest_one_addr_file($$$$) {
     goto fail unless (defined($new_str));
     my @ref_a = split(';', $line);
     my @new_a = split(';', $new_str);
-    goto fail if ((@ref_a < 5) || (@new_a < 5));
-    goto fail if ((@ref_a > 6) || (@new_a > 6));
+    goto fail if ((@ref_a < 4) || (@new_a < 4));
+    goto fail if ((@ref_a > 5) || (@new_a > 5));
     goto fail if ($ref_a[0] ne $new_a[0]);
     goto fail if ($ref_a[2] != $new_a[2]);
     my $ref_ptr = $ref_a[3];
@@ -353,15 +353,9 @@ sub unittest_one_addr_file($$$$) {
     $new_ptr =~ s/\s//g;
     goto fail if ($ref_ptr ne $new_ptr);
 
-    my $ref_bitfield = $ref_a[4];
-    my $new_bitfield = $new_a[4];
-    $ref_bitfield =~ s/\s//g;
-    $new_bitfield =~ s/\s//g;
-    goto fail if ($ref_bitfield ne $new_bitfield);
-
-    if (@ref_a == 6) {
-      my $ref_bitoff = $ref_a[5];
-      my $new_bitoff = $new_a[5];
+    if (@ref_a == 5) {
+      my $ref_bitoff = $ref_a[4];
+      my $new_bitoff = $new_a[4];
       $ref_bitoff =~ s/\s//g;
       $new_bitoff =~ s/\s//g;
       goto fail if ($ref_bitoff ne $new_bitoff);

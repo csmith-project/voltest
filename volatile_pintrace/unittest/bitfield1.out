@@ -1,2 +1,2 @@
-g1.f1; 0x402028; 1; non-pointer; bitfield; ff
-g1.f3; 0x402029; 1; non-pointer; bitfield; fc
+g1.f1; 0x402028; 1; non-pointer; ff
+g1.f3; 0x402029; 1; non-pointer; fc

@@ -1,4 +1,4 @@
-g1.f1; 0x402028; 1; non-pointer; bitfield
-g1.f1; 0x402029; 1; non-pointer; bitfield; f0
-g1.f3; 0x40202a; 1; non-pointer; bitfield
-g1.f4; 0x40202b; 1; non-pointer; bitfield
+g1.f1; 0x402028; 1; non-pointer
+g1.f1; 0x402029; 1; non-pointer; f0
+g1.f3; 0x40202a; 1; non-pointer
+g1.f4; 0x40202b; 1; non-pointer

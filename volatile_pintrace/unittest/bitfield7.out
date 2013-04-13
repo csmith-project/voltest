@@ -1,11 +1,11 @@
-g1.f1; 0x402040; 1; non-pointer; bitfield
-g1.f1; 0x402041; 1; non-pointer; bitfield; f0
-g1.f3; 0x402042; 1; non-pointer; bitfield
-g1.f4; 0x402043; 1; non-pointer; bitfield
-g2.f2.f1; 0x402034; 1; non-pointer; bitfield
-g2.f2.f1; 0x402035; 1; non-pointer; bitfield; f0
-g2.f2.f3; 0x402036; 1; non-pointer; bitfield
-g2.f2.f4; 0x402037; 1; non-pointer; bitfield
-g2.f3; 0x402038; 1; non-pointer; bitfield
-g2.f3; 0x402039; 1; non-pointer; bitfield; c0
-g2.f4; 0x40203c; 4; non-pointer; non-bitfield
+g1.f1; 0x402040; 1; non-pointer
+g1.f1; 0x402041; 1; non-pointer; f0
+g1.f3; 0x402042; 1; non-pointer
+g1.f4; 0x402043; 1; non-pointer
+g2.f2.f1; 0x402034; 1; non-pointer
+g2.f2.f1; 0x402035; 1; non-pointer; f0
+g2.f2.f3; 0x402036; 1; non-pointer
+g2.f2.f4; 0x402037; 1; non-pointer
+g2.f3; 0x402038; 1; non-pointer
+g2.f3; 0x402039; 1; non-pointer; c0
+g2.f4; 0x40203c; 4; non-pointer
