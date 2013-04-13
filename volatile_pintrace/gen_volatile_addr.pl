@@ -71,7 +71,7 @@ sub check_remaining_bits($$$$) {
 
   return if ($$bits_mask eq "00000000"); 
 
-  die "bad prev_addr!" if ($$prev_addr_ref == 0);
+  die "bad prev_addr:$$prev_full_name_ref, $$bits_mask!" if ($$prev_addr_ref == 0);
   my $mask_str = get_mask_str($$bits_mask);
   # print "check: mask_str: $$bits_mask, str:$mask_str\n";
   my $s = sprintf "$$prev_full_name_ref; 0x%x; 1; non-pointer; bitfield; $mask_str\n", $$prev_addr_ref;
@@ -109,6 +109,7 @@ sub process_addr_file($$$) {
   while (my $line = <INF>) {
     chomp $line;
     next if ($line eq "Succeeded");
+    # print "handle:$line\n";
     my @a = split(';', $line);
     if (@a != 5) {
       print "Invalid line:$line\n";
@@ -151,7 +152,7 @@ sub process_addr_file($$$) {
       die "bad bits_sz:$bits_size!" unless (($bits_size % 8) == 0);
       my $f_addr = $addr + $bits_offset / 8;
       $sz = int($bits_size / 8);
-      my $s = sprintf "$a[0]; 0x%x; $sz; $ptr_str; $bitfield_str; 0\n", $f_addr;
+      my $s = sprintf "$a[0]; 0x%x; $sz; $ptr_str; $bitfield_str\n", $f_addr;
       push @$addrs_array, $s;
       next;
     }
@@ -164,7 +165,7 @@ sub process_addr_file($$$) {
       my $remaining_bits = $bits_size % 8;
       if ($remaining_bits == 0) {
         $sz = $bits_size / 8;
-        my $s = sprintf "$a[0]; 0x%x; $sz; $ptr_str; $bitfield_str; 0\n", $f_addr;
+        my $s = sprintf "$a[0]; 0x%x; $sz; $ptr_str; $bitfield_str\n", $f_addr;
         push @$addrs_array, $s;
         $prev_offset = $bits_offset + $bits_size;
       }
@@ -177,7 +178,7 @@ sub process_addr_file($$$) {
         }
 
         $sz = int($bits_size / 8);
-        my $s = sprintf "$a[0]; 0x%x; $sz; $ptr_str; $bitfield_str; 0\n", $f_addr;
+        my $s = sprintf "$a[0]; 0x%x; $sz; $ptr_str; $bitfield_str\n", $f_addr;
         push @$addrs_array, $s;
         $prev_offset = $bits_offset + $sz * 8;
       }
@@ -192,15 +193,16 @@ sub process_addr_file($$$) {
       }
 
       $prev_full_name = $a[0] if ($prev_full_name eq "");
+      if ($prev_addr == 0) {
+        $prev_addr = $addr + int($bits_offset/8);
+      }
+
       my $rel_off = $bits_offset - $prev_offset;
       if (($rel_off + $bits_size) < 8) {
         set_bits(\$bits_mask, $rel_off, $bits_size);
         next;
       }
       set_bits(\$bits_mask, $rel_off, 8-$rel_off);
-      if ($prev_addr == 0) {
-        $prev_addr = $addr + int($bits_offset/8);
-      }
       check_remaining_bits(\$prev_full_name, \$prev_addr, \$bits_mask, $addrs_array);
 
       my $new_offset = 8 * (int($bits_offset/8)) + 8;
@@ -226,7 +228,7 @@ sub process_addr_file($$$) {
         $prev_full_name = $a[0];
       }
       $sz = int($new_bits_sz / 8);
-      my $s = sprintf "$prev_full_name; 0x%x; $sz; $ptr_str; $bitfield_str; 0\n", $f_addr;
+      my $s = sprintf "$prev_full_name; 0x%x; $sz; $ptr_str; $bitfield_str\n", $f_addr;
       push @$addrs_array, $s;
 
       if (($remaining_bits % 8) != 0) {
@@ -350,7 +352,8 @@ sub do_one_unit_test($$$) {
     goto fail unless (defined($new_str));
     my @ref_a = split(';', $line);
     my @new_a = split(';', $new_str);
-    goto fail if ((@ref_a != 6) || (@new_a != 6));
+    goto fail if ((@ref_a < 5) || (@new_a < 5));
+    goto fail if ((@ref_a > 6) || (@new_a > 6));
     goto fail if ($ref_a[0] ne $new_a[0]);
     goto fail if ($ref_a[2] != $new_a[2]);
     my $ref_ptr = $ref_a[3];
@@ -365,11 +368,13 @@ sub do_one_unit_test($$$) {
     $new_bitfield =~ s/\s//g;
     goto fail if ($ref_bitfield ne $new_bitfield);
 
-    my $ref_bitoff = $ref_a[5];
-    my $new_bitoff = $new_a[5];
-    $ref_bitoff =~ s/\s//g;
-    $new_bitoff =~ s/\s//g;
-    goto fail if ($ref_bitoff ne $new_bitoff);
+    if (@ref_a == 6) {
+      my $ref_bitoff = $ref_a[5];
+      my $new_bitoff = $new_a[5];
+      $ref_bitoff =~ s/\s//g;
+      $new_bitoff =~ s/\s//g;
+      goto fail if ($ref_bitoff ne $new_bitoff);
+    }
 
     my $ref_name = get_name($ref_a[0]);
     my $new_name = get_name($ref_a[0]);
@@ -428,8 +433,7 @@ sub do_unit_test($) {
     $ref_out =~ s/\.c/\.out/;
     print "  [$test]...";
     if (do_one_unit_test($test, $ref_out, $regenerate)) {
-      print "FAILED!\n";
-      die "Yang";;
+      die "FAILED!\n";
     }
     else {
       print "SUCCEEDED!\n";
