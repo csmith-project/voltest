@@ -318,20 +318,11 @@ out:
   return 0;
 }
 
-sub do_one_unit_test($$$) {
-  my ($cfile, $ref_out, $regenerate) = @_;
+sub unittest_one_addr_file($$$$) {
+  my ($checker_out, $ref_out, $skip_pointer, $regenerate) = @_;
 
-  %name_to_addr = ();
   @all_vol_addrs = ();
-  my $checker = "../../volatile_checker/volatile_checker --checker=volatile-address";
-  my $checker_out = "checker.out";
-  my $exec = "tmp_test.out";
-  my $cmd;
-  $cmd = "$checker $cfile > $checker_out 2>&1";
-  return -1 if (runit($cmd));
-  $cmd = "gcc $cfile -o tmp_test.out";
-  return -1 if (runit($cmd));
-  return -1 if (doit($checker_out, "", $exec, 1));
+  return -1 if (process_addr_file($checker_out, \@all_vol_addrs, 0));
   if ($regenerate) {
     open OUT, ">$ref_out" or die "cannot open $ref_out";
     foreach my $s (@all_vol_addrs) {
@@ -406,6 +397,28 @@ fail:
   return -1;
 }
 
+sub do_one_unit_test($$$$) {
+  my ($cfile, $ref_out, $all_vars_ref_out, $regenerate) = @_;
+
+  %name_to_addr = ();
+  my $checker_all_vars_out = "checker.all_vars.out";
+  my $checker = "../../volatile_checker/volatile_checker --checker=volatile-address --all-vars-output=$checker_all_vars_out";
+  my $checker_out = "checker.out";
+  my $exec = "tmp_test.out";
+  my $cmd;
+  $cmd = "$checker $cfile > $checker_out 2>&1";
+  return -1 if (runit($cmd));
+  $cmd = "gcc $cfile -o tmp_test.out";
+  return -1 if (runit($cmd));
+
+  my $nm_out = "$exec.nm.out";
+  $cmd = "nm $exec > $nm_out 2>&1";
+  return -1 if (runit($cmd));
+  return -1 if (process_nm_output($nm_out));
+  return -1 if (unittest_one_addr_file($checker_out, $ref_out, 0, $regenerate));
+  return unittest_one_addr_file($checker_all_vars_out, $all_vars_ref_out, 1, $regenerate);
+}
+
 sub do_unit_test($) {
   my ($regenerate) = @_;
   
@@ -431,8 +444,10 @@ sub do_unit_test($) {
   foreach my $test (@all_tests) {
     my $ref_out = $test;
     $ref_out =~ s/\.c/\.out/;
+    my $all_vars_ref_out = $test;
+    $all_vars_ref_out =~ s/\.c/\.all_vars\.out/;
     print "  [$test]...";
-    if (do_one_unit_test($test, $ref_out, $regenerate)) {
+    if (do_one_unit_test($test, $ref_out, $all_vars_ref_out, $regenerate)) {
       die "FAILED!\n";
     }
     else {
