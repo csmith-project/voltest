@@ -226,7 +226,7 @@ sub process_addr_file($$$) {
       # test case bitfield11.c
       if (($rel_off + $bits_size) < 8) {
         set_bits(\$bits_mask, $rel_off, $bits_size);
-        check_remaining_bits(\$prev_full_name, \$prev_addr, \$bits_mask, $addrs_array);
+        # check_remaining_bits(\$prev_full_name, \$prev_addr, \$bits_mask, $addrs_array);
         next;
       }
 
