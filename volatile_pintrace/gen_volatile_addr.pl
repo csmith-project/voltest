@@ -96,6 +96,12 @@ sub set_bits($$$) {
   # print "$$mask, " . get_mask_str($$mask) . "\n";
 }
 
+sub filter_names($) {
+  my ($name) = @_;
+  return 1 if ($name eq "__undefined");
+  return 0;
+}
+
 sub process_addr_file($$$) {
   my ($addr_file, $addrs_array, $skip_pointer) = @_;
 
@@ -124,6 +130,7 @@ sub process_addr_file($$$) {
       $prev_full_name = "";
     }
     $prev_name = $name;
+    next if (filter_names($name));
 
     my $addr = $name_to_addr{$name};
     if (!defined($addr)) {
