@@ -91,6 +91,7 @@ sub set_bits($$$) {
   die "bad set bits: from[$from], sz[$sz]!" if ($to > 8);
   my $s = "";
   $s =~ s/^(.*)/'1' x $sz/e;
+  # print "from[$from], to[$to], sz[$sz]\n";
   substr($$mask, $from, $sz, $s);
   # print "$$mask, " . get_mask_str($$mask) . "\n";
 }
@@ -202,6 +203,19 @@ sub process_addr_file($$$) {
         set_bits(\$bits_mask, $rel_off, $bits_size);
         next;
       }
+
+      # handle hole here: bitfield10.c
+      if ($rel_off > 8) {
+        check_remaining_bits(\$prev_full_name, \$prev_addr, \$bits_mask, $addrs_array);
+        $rel_off = $bits_offset % 8;
+        $prev_offset = 8 * (int($bits_offset/8));
+        die "bad bits_mask:$bits_mask" if ($bits_mask ne "00000000");
+        $prev_full_name = $a[0]; 
+        $prev_addr = $addr + int($bits_offset/8);
+        # print "$prev_offset, $rel_off, $prev_full_name, $prev_addr\n";
+      }
+
+      die "bad rel_off:$rel_off, bits_offset[$bits_offset], prev_offset[$prev_offset]!" if ($rel_off > 8);
       set_bits(\$bits_mask, $rel_off, 8-$rel_off);
       check_remaining_bits(\$prev_full_name, \$prev_addr, \$bits_mask, $addrs_array);
 
