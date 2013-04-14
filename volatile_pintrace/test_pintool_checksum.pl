@@ -41,6 +41,15 @@ my $CSMITH_VOL_OPTS = "";
 my %all_vars = ();
 my %all_addrs_files = ();
 
+my %all_compilers = (
+  "gccO0" => "gcc -O0",
+  "gccO3" => "gcc -O3",
+  "gccOs" => "gcc -Os",
+  "clangO0" => "clang -O0",
+  "clangO3" => "clang -O3",
+  "clangOs" => "clang -Os",
+);
+
 ########################################################################
 sub print_msg($) {
     my $msg = shift;
@@ -68,6 +77,7 @@ my $COMPILER_TIMEOUT_RV = -3;
 my $COMPILER_FAILED = -4;
 my $EXE_TIMEOUT_RV = -5;
 my $EXE_FAILED = -6;
+my $NORMAL_NONEQUAL_CHECKSUM = -7;
 
 sub run_csmith($$) {
   my ($cfile, $redirect_output) = @_;
@@ -124,8 +134,8 @@ sub compile_cfile($$$$$$) {
   return $res;
 }
 
-sub run_exe_with_pin($$$$$) {
-  my ($exe, $compiler, $raw_out, $pin_vol_addrs_file, $pin_all_addrs_file) = @_;
+sub run_exe_with_pin($$$$) {
+  my ($exe, $raw_out, $pin_vol_addrs_file, $pin_all_addrs_file) = @_;
  
   my $res = runit("$RunSafely $PROG_TIMEOUT 1 /dev/null $raw_out ./$exe");
   if ($res == 0) {
@@ -143,8 +153,8 @@ sub run_exe_with_pin($$$$$) {
   return $res;
 }
 
-sub run_exe($$$) {
-  my ($exe, $compiler, $raw_out) = @_;
+sub run_exe($$) {
+  my ($exe, $raw_out) = @_;
  
   my $res = runit("$RunSafely $PROG_TIMEOUT 1 /dev/null $raw_out ./$exe");
   if ($res == $TIMEOUT_RES) {
@@ -233,12 +243,12 @@ sub filter_globals($$) {
 =cut
 }
 
-sub get_addrs_file($$$$$$) {
-  my ($compiler, $root, $cfile, $checker_out, $all_vars_out, $for_unittest) = @_;
+sub get_addrs_file($$$$$$$$) {
+  my ($cmp_name, $compiler, $opt, $root, $cfile, $checker_out, $all_vars_out, $for_unittest) = @_;
 
   my $res;
-  my $exe = "$root.$compiler.out";
-  die "compile_cfile failed!" if (($res = compile_cfile($compiler, "-O0", $cfile, $exe, 1, $for_unittest)) != 0);
+  my $exe = "$root.$cmp_name.out";
+  die "compile_cfile failed!" if (($res = compile_cfile($compiler, $opt, $cfile, $exe, 1, $for_unittest)) != 0);
 
   my $all_addrs_file = "${exe}_all_var_addrs.txt";
   my $vol_addrs_file = "${exe}_vol_addr.txt";
@@ -249,12 +259,12 @@ sub get_addrs_file($$$$$$) {
   return ($exe, $vol_addrs_file, $all_addrs_file);
 }
 
-sub get_checksum($$$$) {
-  my ($compiler, $exe, $pin_vol_addrs_file, $pin_all_addrs_file) = @_;
+sub get_checksum($$$) {
+  my ($exe, $pin_vol_addrs_file, $pin_all_addrs_file) = @_;
 
   my $raw_out = "$exe.raw-out";
   my $res;
-  die "run exe failed!" if (($res = run_exe_with_pin($exe, $compiler, $raw_out, $pin_vol_addrs_file, $pin_all_addrs_file)) != 0);
+  die "run exe failed!" if (($res = run_exe_with_pin($exe, $raw_out, $pin_vol_addrs_file, $pin_all_addrs_file)) != 0);
 
   my ($pin_checksum, $vol_str) = parse_output($raw_out);
   die "Invalid checksum" unless (defined($pin_checksum));
@@ -290,6 +300,69 @@ sub uniq_all_addrs_files() {
   }
 }
 
+sub get_compiler_and_opts($) {
+  my ($str) = @_;
+  my @a = split(' ', $str);
+  die "bad compiler str:$str" if (@a < 2);
+  my $cmd = $a[0];
+  my $num = scalar(@a) - 1;
+  my $opt = join(' ', @a[1..$num]);
+  return ($cmd, $opt);
+}
+
+sub run_compilers_normally($$) {
+  my ($root, $cfile) = @_;
+
+  my $checksum = undef;
+  foreach my $cmp_name (sort keys %all_compilers) {
+    my $res;
+    my ($cmp_cmd, $opt) = get_compiler_and_opts($all_compilers{$cmp_name});
+    my $normal_exe = "$root.normal.$cmp_name.out";
+    return $res if (($res = compile_cfile($cmp_cmd, $opt, $cfile, $normal_exe, 0, 0)) != 0);
+    my $normal_raw_out = "$normal_exe.raw-out";
+    return $res if (($res = run_exe($normal_exe, $normal_raw_out)) != 0);
+    my ($normal_checksum, undef) = parse_output($normal_raw_out);
+    die "Invalid checksum" unless (defined($normal_checksum));
+    if (!defined($checksum)) {
+      $checksum = $normal_checksum;
+    }
+    elsif ($checksum ne $normal_checksum) {
+      return $NORMAL_NONEQUAL_CHECKSUM;
+    }
+  }
+  return 0;
+}
+
+sub run_compilers_with_pin($$$$) {
+  my ($root, $cfile, $checker_out, $all_vars_out) = @_;
+
+  my @exe_queue = ();
+  foreach my $cmp_name (sort keys %all_compilers) {
+    my $res;
+    my ($cmp_cmd, $opt) = get_compiler_and_opts($all_compilers{$cmp_name});
+    my ($exe, $vol_addrs_file, $all_addrs_file) = get_addrs_file($cmp_name, $cmp_cmd, $opt, $root, $cfile, $checker_out, $all_vars_out, 0);
+    push @exe_queue, [$cmp_name, $exe, $vol_addrs_file, $all_addrs_file];
+  }
+  uniq_all_addrs_files();
+
+  my $ref_checksum = undef;
+  my $ref_name = undef;
+  foreach my $elem (@exe_queue) {
+    my ($cmp_name, $exe, $vol_addrs_file, $all_addrs_file) = @$elem;
+    my $checksum = get_checksum($exe, $vol_addrs_file, $all_addrs_file);
+    if (!defined($ref_checksum)) {
+      $ref_checksum = $checksum;
+      $ref_name = $cmp_name;
+    }
+    elsif ($ref_checksum ne $checksum) {
+      die "unmatched checksums[$ref_name:$ref_checksum, $cmp_name:$checksum]!";
+    }
+  }
+  die "undef $ref_checksum!" unless (defined($ref_checksum));
+  print_msg("checksum matched: [$ref_checksum] ");
+  return 0;
+}
+
 sub do_one_test($$) {
   my ($n, $root) = @_;
 
@@ -314,25 +387,13 @@ sub do_one_test($$) {
   $cfile = "${root}.c";
   goto out if (($res = run_csmith($cfile, 1)) != 0);
 
-  my $normal_exe = "$root.normal.gcc.out";
-  goto out if (($res = compile_cfile("gcc", "-O0", $cfile, $normal_exe, 0, $for_unittest)) != 0);
-  my $normal_raw_out = "$normal_exe.raw-out";
-  goto out if (($res = run_exe($normal_exe, "gcc", $normal_raw_out)) != 0);
-  my ($normal_checksum, undef) = parse_output($normal_raw_out);
-  die "Invalid checksum" unless (defined($normal_checksum));
+  goto out if (($res = run_compilers_normally($root, $cfile)) != 0);
 
   my $checker_out = "$root.checker.out";
   my $all_vars_out = "$root.checker.all.vars.out";
   die "checker failed!" if (($res = run_checker($root, $checker_out, $all_vars_out, $for_unittest)) != 0);
   
-  my ($gcc_exe, $gcc_vol_addrs_file, $gcc_all_addrs_file) = get_addrs_file("gcc", $root, $cfile, $checker_out, $all_vars_out, $for_unittest);
-  my ($clang_exe, $clang_vol_addrs_file, $clang_all_addrs_file) = get_addrs_file("clang", $root, $cfile, $checker_out, $all_vars_out, $for_unittest);
-  uniq_all_addrs_files();
-
-  my $gcc_checksum = get_checksum("gcc", $gcc_exe, $gcc_vol_addrs_file, $gcc_all_addrs_file);
-  my $clang_checksum = get_checksum("clang", $clang_exe, $clang_vol_addrs_file, $clang_all_addrs_file);
-  die "unmatched checksums[$gcc_checksum, $clang_checksum]!" unless ($gcc_checksum eq $clang_checksum);
-  print_msg("checksum matched: [$gcc_checksum, $clang_checksum] ");
+  $res = run_compilers_with_pin($root, $cfile, $checker_out, $all_vars_out);
 
 out:
   chdir "..";
@@ -367,7 +428,7 @@ sub do_one_unittest($) {
   my $normal_exe = "$root.normal.gcc.out";
   goto out if (($res = compile_cfile("gcc", "-O0", $cfile, $normal_exe, 0, $for_unittest)) != 0);
   my $normal_raw_out = "$normal_exe.raw-out";
-  goto out if (($res = run_exe($normal_exe, "gcc", $normal_raw_out)) != 0);
+  goto out if (($res = run_exe($normal_exe, $normal_raw_out)) != 0);
   my ($normal_checksum, undef) = parse_output($normal_raw_out);
   die "Invalid checksum" unless (defined($normal_checksum));
 
@@ -375,9 +436,9 @@ sub do_one_unittest($) {
   my $all_vars_out = "$root.checker.all.vars.out";
   die "checker failed!" if (($res = run_checker($root, $checker_out, $all_vars_out, $for_unittest)) != 0);
   
-  my ($gcc_exe, $gcc_vol_addrs_file, $gcc_all_addrs_file) = get_addrs_file("gcc", $root, $cfile, $checker_out, $all_vars_out, $for_unittest);
+  my ($gcc_exe, $gcc_vol_addrs_file, $gcc_all_addrs_file) = get_addrs_file("gccO0", "gcc", "-O0", $root, $cfile, $checker_out, $all_vars_out, $for_unittest);
   uniq_all_addrs_files();
-  my $gcc_checksum = get_checksum("gcc", $gcc_exe, $gcc_vol_addrs_file, $gcc_all_addrs_file);
+  my $gcc_checksum = get_checksum($gcc_exe, $gcc_vol_addrs_file, $gcc_all_addrs_file);
   die "unmatched checksums[$normal_checksum, $gcc_checksum]!" unless ($gcc_checksum eq $normal_checksum);
   print_msg("checksum matched: [$normal_checksum, $gcc_checksum] ");
 
@@ -407,6 +468,9 @@ sub test_with_csmith() {
     }
     elsif ($res == $EXE_FAILED) {
       print "exe failed\n";
+    }
+    elsif ($res == $NORMAL_NONEQUAL_CHECKSUM) {
+      print "unmached checksums for normal compilation, skip it\n";
     }
     elsif ($res != 0) {
       die "uncaught res: $res";
@@ -464,6 +528,7 @@ Usage: ./test_pintool_checksum
     --with-csmith: test the pintool using programs generated by Csmith
     --iteration=<num>: how many runs of testing the pintool [default: 100]
     --help: this message
+    --keep-temps: keep temp result of each test
     --quiet: disables verbose message
 ';
 
@@ -559,7 +624,7 @@ sub check_prereqs($) {
     next if (runit("$GEN_VOLATILE_ADDR --vars-file=$checker_out --all-vars-file=$all_addr_file --all-var-addrs-output=$pin_all_addrs_file $exe > $pin_vol_addrs_file 2>&1"));
     $test_case_ok = 1;
     my $raw_out = "$exe.raw-out";
-    if (run_exe_with_pin($exe, "gcc", $raw_out, $pin_vol_addrs_file, $pin_all_addrs_file) == 0) {
+    if (run_exe_with_pin($exe, $raw_out, $pin_vol_addrs_file, $pin_all_addrs_file) == 0) {
       $run_exe_ok = 1;
       last;
     }
