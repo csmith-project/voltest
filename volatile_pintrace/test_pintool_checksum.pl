@@ -138,7 +138,7 @@ sub run_exe_with_pin($$$$$) {
     return $EXE_TIMEOUT_RV;
   }
   elsif ($res != 0) {
-    die "pintool failed to run exe!";
+    die "pintool failed to run exe: $res!";
   }
   return $res;
 }
@@ -290,16 +290,12 @@ sub uniq_all_addrs_files() {
   }
 }
 
-sub do_one_test($$$) {
-  my ($n, $for_unittest, $root) = @_;
+sub do_one_test($$) {
+  my ($n, $root) = @_;
 
+  my $for_unittest = 0;
   my $nstr;
-  if (!$for_unittest) {
-    $nstr = sprintf "%06d", $n;
-  }
-  else {
-    $nstr = $root;
-  }
+  $nstr = sprintf "%06d", $n;
   my $dir = $nstr;
 
   if (-d $dir) {
@@ -314,15 +310,9 @@ sub do_one_test($$$) {
 
   my $res = 0;
   my $cfile;
-  if (!$for_unittest) {
-    $root = "rand$nstr";
-    $cfile = "${root}.c";
-    goto out if (($res = run_csmith($cfile, 1)) != 0);
-  }
-  else {
-    $cfile = "${root}.c";
-    die "failed to copy test: [$cfile]" if (runit("cp $UNITTEST_DIR/$cfile ."));
-  }
+  $root = "rand$nstr";
+  $cfile = "${root}.c";
+  goto out if (($res = run_csmith($cfile, 1)) != 0);
 
   my $normal_exe = "$root.normal.gcc.out";
   goto out if (($res = compile_cfile("gcc", "-O0", $cfile, $normal_exe, 0, $for_unittest)) != 0);
@@ -336,21 +326,60 @@ sub do_one_test($$$) {
   die "checker failed!" if (($res = run_checker($root, $checker_out, $all_vars_out, $for_unittest)) != 0);
   
   my ($gcc_exe, $gcc_vol_addrs_file, $gcc_all_addrs_file) = get_addrs_file("gcc", $root, $cfile, $checker_out, $all_vars_out, $for_unittest);
-  if ($for_unittest) {
-    uniq_all_addrs_files();
-    my $gcc_checksum = get_checksum("gcc", $gcc_exe, $gcc_vol_addrs_file, $gcc_all_addrs_file);
-    die "unmatched checksums[$normal_checksum, $gcc_checksum]!" unless ($gcc_checksum eq $normal_checksum);
-    print_msg("checksum matched: [$normal_checksum, $gcc_checksum] ");
+  my ($clang_exe, $clang_vol_addrs_file, $clang_all_addrs_file) = get_addrs_file("clang", $root, $cfile, $checker_out, $all_vars_out, $for_unittest);
+  uniq_all_addrs_files();
+
+  my $gcc_checksum = get_checksum("gcc", $gcc_exe, $gcc_vol_addrs_file, $gcc_all_addrs_file);
+  my $clang_checksum = get_checksum("clang", $clang_exe, $clang_vol_addrs_file, $clang_all_addrs_file);
+  die "unmatched checksums[$gcc_checksum, $clang_checksum]!" unless ($gcc_checksum eq $clang_checksum);
+  print_msg("checksum matched: [$gcc_checksum, $clang_checksum] ");
+
+out:
+  chdir "..";
+  return $res if ($KEEP_TEMPS);
+  system "rm -rf $dir" unless ($for_unittest && $res);
+  return $res;
+}
+
+sub do_one_unittest($) {
+  my ($root) = @_;
+
+  my $nstr;
+  my $for_unittest = 1;
+  $nstr = $root;
+  my $dir = $nstr;
+
+  if (-d $dir) {
+    system ("rm -rf $dir/*");
   }
   else {
-    my ($clang_exe, $clang_vol_addrs_file, $clang_all_addrs_file) = get_addrs_file("clang", $root, $cfile, $checker_out, $all_vars_out, $for_unittest);
-    uniq_all_addrs_files();
-
-    my $gcc_checksum = get_checksum("gcc", $gcc_exe, $gcc_vol_addrs_file, $gcc_all_addrs_file);
-    my $clang_checksum = get_checksum("clang", $clang_exe, $clang_vol_addrs_file, $clang_all_addrs_file);
-    die "unmatched checksums[$gcc_checksum, $clang_checksum]!" unless ($gcc_checksum eq $clang_checksum);
-    print_msg("checksum matched: [$gcc_checksum, $clang_checksum] ");
+    system "mkdir $dir";
   }
+  chdir $dir;
+  %all_vars = ();
+  %all_addrs_files = ();
+
+  my $res = 0;
+  my $cfile;
+  $cfile = "${root}.c";
+  die "failed to copy test: [$cfile]" if (runit("cp $UNITTEST_DIR/$cfile ."));
+
+  my $normal_exe = "$root.normal.gcc.out";
+  goto out if (($res = compile_cfile("gcc", "-O0", $cfile, $normal_exe, 0, $for_unittest)) != 0);
+  my $normal_raw_out = "$normal_exe.raw-out";
+  goto out if (($res = run_exe($normal_exe, "gcc", $normal_raw_out)) != 0);
+  my ($normal_checksum, undef) = parse_output($normal_raw_out);
+  die "Invalid checksum" unless (defined($normal_checksum));
+
+  my $checker_out = "$root.checker.out";
+  my $all_vars_out = "$root.checker.all.vars.out";
+  die "checker failed!" if (($res = run_checker($root, $checker_out, $all_vars_out, $for_unittest)) != 0);
+  
+  my ($gcc_exe, $gcc_vol_addrs_file, $gcc_all_addrs_file) = get_addrs_file("gcc", $root, $cfile, $checker_out, $all_vars_out, $for_unittest);
+  uniq_all_addrs_files();
+  my $gcc_checksum = get_checksum("gcc", $gcc_exe, $gcc_vol_addrs_file, $gcc_all_addrs_file);
+  die "unmatched checksums[$normal_checksum, $gcc_checksum]!" unless ($gcc_checksum eq $normal_checksum);
+  print_msg("checksum matched: [$normal_checksum, $gcc_checksum] ");
 
 out:
   chdir "..";
@@ -363,7 +392,7 @@ sub test_with_csmith() {
   chdir $WORKING_DIR or die;
   for (my $i = 0; $i < $ITERATION; $i++) {
     print "[test $i]...";
-    my $res = do_one_test($i, 0, undef);
+    my $res = do_one_test($i, 0);
     if ($res == $CSMITH_FAILED) {
       print "Csmith failed\n";
     }
@@ -405,7 +434,7 @@ sub do_unittest() {
     my $root = $cfile;
     $root =~ s/\.c$//;
     print "Testing [$cfile]...";
-    if (do_one_test(undef, 1, $root) == 0) {
+    if (do_one_unittest($root) == 0) {
       print "Succeeded\n";
     }
     else {
