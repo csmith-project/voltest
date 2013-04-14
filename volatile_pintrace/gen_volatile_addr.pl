@@ -223,13 +223,21 @@ sub process_addr_file($$$) {
       }
 
       die "bad rel_off:$rel_off, bits_offset[$bits_offset], prev_offset[$prev_offset]!" if ($rel_off > 8);
+      # test case bitfield11.c
+      if (($rel_off + $bits_size) < 8) {
+        set_bits(\$bits_mask, $rel_off, $bits_size);
+        check_remaining_bits(\$prev_full_name, \$prev_addr, \$bits_mask, $addrs_array);
+        next;
+      }
+
       set_bits(\$bits_mask, $rel_off, 8-$rel_off);
       check_remaining_bits(\$prev_full_name, \$prev_addr, \$bits_mask, $addrs_array);
 
       my $new_offset = 8 * (int($bits_offset/8)) + 8;
       my $new_bits_sz = $bits_size - ($new_offset - $bits_offset);
       $prev_offset = $new_offset;
-      die "bad new_bits_sz[$new_bits_sz]!" if ($new_bits_sz < 0);
+      die "bad new_bits_sz[$new_bits_sz]: $a[0], bits_size[$bits_size], new_offset[$new_offset], bits_offset[$bits_offset]!" 
+        if ($new_bits_sz < 0);
       next if ($new_bits_sz == 0);
 
       my $remaining_bits = $new_bits_sz % 8;
