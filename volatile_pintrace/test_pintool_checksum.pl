@@ -188,7 +188,7 @@ sub get_full_name($) {
   my ($line) = @_;
 
   my @a = split(';', $line);
-  die "bad line:$line" unless(@a == 4);
+  die "bad line:$line" unless((@a == 4) || (@a == 5));
   my $name = $a[0];
   $name =~ s/[\s\t]//g;
   return $name;
