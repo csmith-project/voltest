@@ -331,6 +331,8 @@ static BOOL logging = FALSE;
 
 static BOOL enable_random_reads = FALSE;
 
+static BOOL enable_debugging_messages = FALSE;
+
 enum OUTPUT_MODE {
     M_CHECKSUM,
     M_SUMMARY,
@@ -353,6 +355,9 @@ KNOB<BOOL> KnobRandomRead(KNOB_MODE_WRITEONCE, "pintool",
 
 KNOB<uint64_t> KnobSeed(KNOB_MODE_WRITEONCE, "pintool",
     "seed", "0", "seed");
+
+KNOB<BOOL> KnobDebug(KNOB_MODE_WRITEONCE, "pintool",
+    "debug", "0", "print out some debugging messages");
 
 static void SplitString(const string &str, vector<string> &v, const char sep_char)
 {
@@ -463,7 +468,9 @@ static void ComputeCsmithChecksum(const VolElem *elem)
 
     size_t sz = elem->get_size();
     uint8_t mask = elem->get_bits_mask();
-    // cout << "pintool name: " << elem->get_name() << "\n";
+    if (enable_debugging_messages)
+        cout << "pintool name: " << elem->get_name() << "\n";
+
     for (size_t i = 0; i < sz; i++) {
         unsigned int value = 0;
 
@@ -471,7 +478,8 @@ static void ComputeCsmithChecksum(const VolElem *elem)
         if ((sz == 1) && mask) {
           value &= mask;
         }
-        // cout << "pintool value: " << value << "\n";
+        if (enable_debugging_messages)
+            cout << "pintool value: " << value << "\n";
         Crc32(value, &crc32_context, crc32_tab);
     }
 }
@@ -740,6 +748,7 @@ int main(int argc, char *argv[])
         return Usage();
 
     enable_random_reads = KnobRandomRead.Value();
+    enable_debugging_messages = KnobDebug.Value();
     if (enable_random_reads) {
         seed = KnobSeed.Value();
         if (!seed)
@@ -759,6 +768,6 @@ int main(int argc, char *argv[])
 
     // Never returns
     PIN_StartProgram();
-    
+
     return 0;
 }
