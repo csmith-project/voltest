@@ -1,4 +1,4 @@
-g1.f1; 0x402040; 4; non-pointer
+g1.f1+; 0x402040; 4; non-pointer
 g1.f2; 0x402048; 8; non-pointer
 (g1.f3+0).f1; 0x402050; 1; non-pointer
 (g1.f3+0).f2; 0x402054; 4; non-pointer
