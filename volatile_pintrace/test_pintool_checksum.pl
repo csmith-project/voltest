@@ -204,10 +204,20 @@ sub get_full_name($) {
   return $name;
 }
 
-sub add_one_var($) {
-  my ($line) = @_;
+sub add_one_var($$) {
+  my ($line, $visited_names) = @_;
 
   my $name = get_full_name($line);
+
+  # we have something like the following due to bitfields:
+  # (g_93+0).f0; 0x40c188; 2; non-pointer
+  # (g_93+0).f0; 0x40c18a; 1; non-pointer; e0
+  # only need to count the name once for this case,
+  # otherwise, uniq_all_addrs_files will be broken
+  my $visited = $visited_names->{$name};
+  return if (defined($visited));
+
+  $visited_names->{$name} = 1;
   my $count = $all_vars{$name};
   if (defined($count)) {
     $all_vars{$name} = $count+1;
@@ -220,6 +230,8 @@ sub add_one_var($) {
 sub filter_globals($$) {
   my ($fname, $for_unittest) = @_;
 
+  # print "file:$fname\n";
+  my %visited_names = ();
   my @all_lines = ();
   my $s = "";
   open INF, "<$fname" or die "cannot open $fname!";
@@ -227,7 +239,7 @@ sub filter_globals($$) {
     chomp $line;
     if ($line =~ m/^[(\s\t]*g_/) {
       $s .= "$line\n";
-      add_one_var($line);
+      add_one_var($line, \%visited_names);
       push @all_lines, $line;
     }
   }
