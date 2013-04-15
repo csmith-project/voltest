@@ -28,7 +28,7 @@ my $RunSafely;
 
 my $COMPILER_TIMEOUT = 600;
 my $PROG_TIMEOUT = 5;
-my $PIN_PROG_TIMEOUT = 30;
+my $PIN_PROG_TIMEOUT = 300;
 my $CSMITH_TIMEOUT = 180; 
 my $TIMEOUT_RES = 137;
 #on darwin timeout res is 152 instead of 137
@@ -271,17 +271,18 @@ sub get_addrs_file($$$$$$$$) {
   return ($exe, $vol_addrs_file, $all_addrs_file);
 }
 
-sub get_checksum($$$) {
-  my ($exe, $pin_vol_addrs_file, $pin_all_addrs_file) = @_;
+sub get_checksum($$$$) {
+  my ($exe, $pin_vol_addrs_file, $pin_all_addrs_file, $checksum) = @_;
 
   my $raw_out = "$exe.raw-out";
   my $res;
-  die "run exe failed!" if (($res = run_exe_with_pin($exe, $raw_out, $pin_vol_addrs_file, $pin_all_addrs_file)) != 0);
+  return $res if (($res = run_exe_with_pin($exe, $raw_out, $pin_vol_addrs_file, $pin_all_addrs_file)) != 0);
 
   my ($pin_checksum, $vol_str) = parse_output($raw_out);
   die "Invalid checksum" unless (defined($pin_checksum));
   die "Invalid vol_str" unless (defined($vol_str));
-  return $pin_checksum;
+  $$checksum = $pin_checksum;
+  return 0;
 }
 
 # compilers may not emit globals in an object, e.g.
@@ -361,7 +362,10 @@ sub run_compilers_with_pin($$$$) {
   my $ref_name = undef;
   foreach my $elem (@exe_queue) {
     my ($cmp_name, $exe, $vol_addrs_file, $all_addrs_file) = @$elem;
-    my $checksum = get_checksum($exe, $vol_addrs_file, $all_addrs_file);
+    my $checksum;
+    my $res = get_checksum($exe, $vol_addrs_file, $all_addrs_file, \$checksum);
+    return $res if ($res != 0);
+
     if (!defined($ref_checksum)) {
       $ref_checksum = $checksum;
       $ref_name = $cmp_name;
@@ -450,7 +454,8 @@ sub do_one_unittest($) {
   
   my ($gcc_exe, $gcc_vol_addrs_file, $gcc_all_addrs_file) = get_addrs_file("gccO0", "gcc", "-O0", $root, $cfile, $checker_out, $all_vars_out, $for_unittest);
   uniq_all_addrs_files();
-  my $gcc_checksum = get_checksum($gcc_exe, $gcc_vol_addrs_file, $gcc_all_addrs_file);
+  my $gcc_checksum;
+  die "get_checksum failed: res[$res]" if (($res = get_checksum($gcc_exe, $gcc_vol_addrs_file, $gcc_all_addrs_file, \$gcc_checksum) != 0));
   die "unmatched checksums[$normal_checksum, $gcc_checksum]!" unless ($gcc_checksum eq $normal_checksum);
   print_msg("checksum matched: [$normal_checksum, $gcc_checksum] ");
 
@@ -459,6 +464,35 @@ out:
   return $res if ($KEEP_TEMPS);
   system "rm -rf $dir" unless ($for_unittest && $res);
   return $res;
+}
+
+sub print_res($) {
+  my ($res) = @_;
+
+  if ($res == $CSMITH_FAILED) {
+    print "Csmith failed\n";
+  }
+  elsif ($res == $COMPILER_TIMEOUT_RV) {
+    print "compiler timeout\n";
+  }
+  elsif ($res == $COMPILER_FAILED) {
+    print "compiler failed\n";
+  }
+  elsif ($res == $EXE_TIMEOUT_RV) {
+    print "exe timeout\n";
+  }
+  elsif ($res == $EXE_FAILED) {
+    print "exe failed\n";
+  }
+  elsif ($res == $NORMAL_NONEQUAL_CHECKSUM) {
+    print "unmached checksums for normal compilation, skip it\n";
+  }
+  elsif ($res != 0) {
+    die "uncaught res: $res";
+  }
+  else {
+    print "succeeded!\n";
+  }
 }
 
 sub redo_test($$) {
@@ -479,8 +513,8 @@ sub redo_test($$) {
     die "checker failed!" if (($res = run_checker($root, $checker_out, $all_vars_out, 0)) != 0);
   }
 
-  run_compilers_with_pin($root, $cfile, $checker_out, $all_vars_out);
-  print "\nSucceeded!\n";
+  $res = run_compilers_with_pin($root, $cfile, $checker_out, $all_vars_out);
+  print_res($res);
 }
 
 sub test_with_csmith() {
@@ -488,28 +522,7 @@ sub test_with_csmith() {
   for (my $i = 0; $i < $ITERATION; $i++) {
     print "[test $i]...";
     my $res = do_one_test($i, 0);
-    if ($res == $CSMITH_FAILED) {
-      print "Csmith failed\n";
-    }
-    elsif ($res == $COMPILER_TIMEOUT_RV) {
-      print "compiler timeout\n";
-    }
-    elsif ($res == $COMPILER_FAILED) {
-      print "compiler failed\n";
-    }
-    elsif ($res == $EXE_TIMEOUT_RV) {
-      print "exe timeout\n";
-    }
-    elsif ($res == $EXE_FAILED) {
-      print "exe failed\n";
-    }
-    elsif ($res == $NORMAL_NONEQUAL_CHECKSUM) {
-      print "unmached checksums for normal compilation, skip it\n";
-    }
-    elsif ($res != 0) {
-      die "uncaught res: $res";
-    }
-    print "succeeded!\n";
+    print_res($res);
   }
 
   print "------------------------------\n";
