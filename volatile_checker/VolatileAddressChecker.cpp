@@ -160,7 +160,8 @@ void VolatileAddressChecker::addOneVolatileAddress(const std::string &Name,
   AllVolAddrs.push_back(SS.str());
 }
 
-void VolatileAddressChecker::handleOneUnion(const std::string &Prefix,
+void VolatileAddressChecker::handleOneUnion(bool IsVol,
+                                            const std::string &Prefix,
                                             uint64_t Offset,
                                             const RecordDecl *RD)
 {
@@ -190,8 +191,9 @@ void VolatileAddressChecker::handleOneUnion(const std::string &Prefix,
     return;
   
   QualType QT = MaxFD->getType();
+  IsVol = IsVol || QT.isVolatileQualified();
   // TODO: skip volatile for now;
-  if (QT.isVolatileQualified())
+  if (IsVol)
     return;
 
   if (MaxFD->isBitField()) {
@@ -204,7 +206,8 @@ void VolatileAddressChecker::handleOneUnion(const std::string &Prefix,
   }
   else {
     UnionLevelCount++;
-    handleOneDeclaratorDecl(Prefix,
+    handleOneDeclaratorDecl(IsVol,
+                            Prefix,
                             Offset,
                             MaxFD);
     UnionLevelCount--;
@@ -212,7 +215,8 @@ void VolatileAddressChecker::handleOneUnion(const std::string &Prefix,
   }
 }
 
-void VolatileAddressChecker::handleOneStructure(const std::string &Prefix,
+void VolatileAddressChecker::handleOneStructure(bool IsVol,
+                                                const std::string &Prefix,
                                                 uint64_t Offset,
                                                 const RecordDecl *RD)
 {
@@ -228,6 +232,8 @@ void VolatileAddressChecker::handleOneStructure(const std::string &Prefix,
     unsigned Idx = FD->getFieldIndex();
     CheckerAssert((Idx < Count) && "Invalid Field Index!");
     uint64_t Field_Off = Offset + Info.getFieldOffset(Idx);
+    QualType QT = FD->getType();
+    bool IsVolFD = IsVol || QT.isVolatileQualified();
 
     if (FD->isBitField()) {
       uint64_t Field_Sz = FD->getBitWidthValue(*Context);
@@ -235,8 +241,7 @@ void VolatileAddressChecker::handleOneStructure(const std::string &Prefix,
       if (!Field_Sz)
         continue;
 
-      QualType QT = FD->getType();
-      addOneAddress(QT.isVolatileQualified(),
+      addOneAddress(IsVolFD,
                     true,
                     Prefix + FD->getNameAsString(),
                     Field_Off,
@@ -244,14 +249,16 @@ void VolatileAddressChecker::handleOneStructure(const std::string &Prefix,
                     "non-pointer");
     }
     else {
-      handleOneDeclaratorDecl(Prefix,
+      handleOneDeclaratorDecl(IsVolFD, 
+                              Prefix,
                               Field_Off,
                               FD);
     }
   }
 }
 
-void VolatileAddressChecker::handleOneArray(const std::string &Prefix,
+void VolatileAddressChecker::handleOneArray(bool IsVol,
+                                            const std::string &Prefix,
                                             uint64_t Offset,
                                             const ArrayType *AT)
 {
@@ -260,13 +267,13 @@ void VolatileAddressChecker::handleOneArray(const std::string &Prefix,
   if (!T)
     return;
 
-  const Type *ElemTy = Context->getBaseElementType(T).getTypePtr();
+  QualType ElemQT = Context->getBaseElementType(T);
+  const Type *ElemTy = ElemQT.getTypePtr();
   const RecordType *ST = ElemTy->getAsStructureType();
   const RecordType *UT = ElemTy->getAsUnionType();
   if (!ST && !UT) {
-    if (!DumpAllVars)
-      return;
-    addOneAddress(false, false, Prefix, Offset,
+    IsVol = IsVol || ElemQT.isVolatileQualified();
+    addOneAddress(IsVol, false, Prefix, Offset,
                   Context->getTypeSize(T), 
                   getPointerStr(Context->getBaseElementType(T)));
     return;
@@ -278,22 +285,25 @@ void VolatileAddressChecker::handleOneArray(const std::string &Prefix,
     std::stringstream SS;
     SS << I;
     if (ST) {
-      handleOneStructure("(" + Prefix + SS.str() + ").", 
+      handleOneStructure(IsVol, "(" + Prefix + SS.str() + ").", 
                          Elem_Off, ST->getDecl());
     }
     else {
-      handleOneUnion("(" + Prefix + SS.str() + ").", Elem_Off, UT->getDecl());
+      handleOneUnion(IsVol, "(" + Prefix + SS.str() + ").", 
+                     Elem_Off, UT->getDecl());
     }
   }
 }
 
-void VolatileAddressChecker::handleOneDeclaratorDecl(const std::string &Prefix,
+void VolatileAddressChecker::handleOneDeclaratorDecl(bool IsVol,
+                                               const std::string &Prefix,
                                                uint64_t Offset, 
                                                const DeclaratorDecl *DD)
 {
   QualType QT = DD->getType();
-  bool IsVol = QT.isVolatileQualified();
+  IsVol = IsVol || QT.isVolatileQualified();
 
+#if 0
   if (IsVol) {
     addOneAddress(IsVol,
                   false,
@@ -303,26 +313,27 @@ void VolatileAddressChecker::handleOneDeclaratorDecl(const std::string &Prefix,
                   getPointerStr(QT));
     return;
   }
+#endif
 
   const Type *Ty = QT.getTypePtr();
   if (const RecordType *RT = Ty->getAsStructureType()) {
     const RecordDecl *RD = RT->getDecl();
-    handleOneStructure(Prefix + DD->getNameAsString() + ".", Offset, RD);
+    handleOneStructure(IsVol, Prefix + DD->getNameAsString() + ".", Offset, RD);
     return;
   }
 
   if (const RecordType *RT = Ty->getAsUnionType()) {
     const RecordDecl *RD = RT->getDecl();
-    handleOneUnion(Prefix + DD->getNameAsString() + ".", Offset, RD);
+    handleOneUnion(IsVol, Prefix + DD->getNameAsString() + ".", Offset, RD);
     return;
   }
 
   if (const ArrayType *AT = Context->getAsArrayType(QT)) {
-    handleOneArray(Prefix + DD->getNameAsString() + "+", Offset, AT);
+    handleOneArray(IsVol, Prefix + DD->getNameAsString() + "+", Offset, AT);
     return;
   }
 
-  CheckerAssert(!IsVol && "No volatile var here!");
+  // CheckerAssert(!IsVol && "No volatile var here!");
   addOneAddress(IsVol,
                 false,
                 Prefix + DD->getNameAsString(),
@@ -352,6 +363,8 @@ void VolatileAddressChecker::handleOneVarDecl(const VarDecl *VD)
     QualType QT = VD->getType();
     // ISSUE: we may also need to consider a struct var
     // where the struct has bit-fields.
+    // for example, invoke handleOneDeclarationDecl with 
+    // true IsVol 
     addOneVolatileAddress(VD->getNameAsString(),
                           0,
                           Context->getTypeSize(QT),
@@ -359,7 +372,7 @@ void VolatileAddressChecker::handleOneVarDecl(const VarDecl *VD)
     return;
   }
 
-  handleOneDeclaratorDecl("", 0, VD);
+  handleOneDeclaratorDecl(false, "", 0, VD);
 }
 
 std::string VolatileAddressChecker::getPointerStr(const QualType &QT)

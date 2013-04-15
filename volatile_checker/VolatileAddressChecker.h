@@ -60,19 +60,23 @@ private:
 
   void handleOneDeclRefExpr(const clang::DeclRefExpr *DRE);
 
-  void handleOneStructure(const std::string &Prefix,
+  void handleOneStructure(bool IsVol,
+                          const std::string &Prefix,
                           uint64_t Offset,
                           const clang::RecordDecl *RD);
 
-  void handleOneUnion(const std::string &Prefix,
+  void handleOneUnion(bool IsVol,
+                      const std::string &Prefix,
                       uint64_t Offset,
                       const clang::RecordDecl *RD);
 
-  void handleOneArray(const std::string &Prefix,
+  void handleOneArray(bool IsVol,
+                      const std::string &Prefix,
                       uint64_t Offset,
                       const clang::ArrayType *AT);
 
-  void handleOneDeclaratorDecl(const std::string &Prefix,
+  void handleOneDeclaratorDecl(bool IsVol,
+                               const std::string &Prefix,
                                uint64_t Offset,
                                const clang::DeclaratorDecl *DD);
 
