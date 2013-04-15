@@ -476,7 +476,24 @@ static void ComputeCsmithChecksum(const VolElem *elem)
 
         PIN_SafeCopy(&value, (char*)(addr+i), 1);
         if ((sz == 1) && mask) {
-          value &= mask;
+            if (enable_debugging_messages)
+                cout << "pintool value(before): " << value << "\n";
+            if (mask == 0xff) {
+                value &= mask;
+            }
+            else {
+                // if we have bitfield pattern like:
+                // f8, both llvm/gcc actually use the lower 5 bits of this byte.
+                // so we do correct conversion here
+                uint8_t new_mask = mask;
+                uint8_t count = 0;
+                while ((new_mask & 0x01) == 0) {
+                  new_mask >>= 1;
+                  count++;
+                }
+                assert((count < 8) && "Bad mask!");
+                value &= new_mask;
+            }
         }
         if (enable_debugging_messages)
             cout << "pintool value: " << value << "\n";
