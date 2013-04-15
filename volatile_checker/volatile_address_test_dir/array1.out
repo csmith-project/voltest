@@ -1,2 +1,2 @@
-a; 0; 320; non-pointer; non-bitfield
+a+; 0; 320; non-pointer; non-bitfield
 Succeeded
