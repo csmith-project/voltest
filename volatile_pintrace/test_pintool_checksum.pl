@@ -461,8 +461,8 @@ out:
   return $res;
 }
 
-sub redo_test($) {
-  my ($nstr) = @_;
+sub redo_test($$) {
+  my ($nstr, $redo_checker) = @_;
 
   chdir $WORKING_DIR or die;
   chdir $nstr or die "cannot chdir $nstr";
@@ -475,9 +475,12 @@ sub redo_test($) {
 
   my $checker_out = "$root.checker.out";
   my $all_vars_out = "$root.checker.all.vars.out";
-  # die "checker failed!" if (($res = run_checker($root, $checker_out, $all_vars_out, 1)) != 0);
+  if ($redo_checker) {
+    die "checker failed!" if (($res = run_checker($root, $checker_out, $all_vars_out, 0)) != 0);
+  }
 
   run_compilers_with_pin($root, $cfile, $checker_out, $all_vars_out);
+  print "\nSucceeded!\n";
 }
 
 sub test_with_csmith() {
@@ -560,6 +563,7 @@ Usage: ./test_pintool_checksum
     --iteration=<num>: how many runs of testing the pintool [default: 100]
     --help: this message
     --redo=test: redo test such as 000001
+    --redo-checker: used with --redo=test, will re-run the checker upon enabled 
     --keep-temps: keep temp result of each test
     --quiet: disables verbose message
 ';
@@ -685,6 +689,7 @@ sub main() {
   my @unused = ();
   my $with_csmith = 0;
   my $redo_test = undef;
+  my $redo_checker = 0;
 
   while(defined ($opt = shift @ARGV)) {
     if ($opt =~ m/^--(.+)=(.+)$/) {
@@ -705,6 +710,9 @@ sub main() {
       elsif ($1 eq "with-csmith") {
         $with_csmith = 1;
       }
+      elsif ($1 eq "redo-checker") {
+        $redo_checker = 1;
+      }
       elsif ($1 eq "keep-temps") {
         $KEEP_TEMPS = 1;
       }
@@ -724,7 +732,7 @@ sub main() {
     test_with_csmith();
   }
   elsif (defined($redo_test)) {
-    redo_test($redo_test);
+    redo_test($redo_test, $redo_checker);
   }
   else {
     do_unittest();
