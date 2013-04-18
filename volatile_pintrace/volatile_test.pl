@@ -21,16 +21,18 @@ my $PIN_SEED = "";
 my $PIN_RANDOM_READ = "";
 my $WORKING_DIR = "work0";
 #my $ITERATION = 100000000;
-my $ITERATION = 100;
+my $ITERATION = 10;
 my $USE_SWARM = 1;
 my $VERBOSE = 1;
+my $KEEP_TEMPS = 0;
+my $NOT_PRINT_CHECKSUM = 0;
 my $CHECKER;
 my $GEN_VOLATILE_ADDR;
 my $RunSafely;
 
 ##########################################################
 # compilers under test
-my $COMPILER_COMMON_OPTS = "-w -DINLINE= -DCSMITH_MINIMAL -DWRAP_VOLATILES=0 -DNOT_PRINT_CHECKSUM";
+my $COMPILER_COMMON_OPTS = "-w -DINLINE= -DCSMITH_MINIMAL -DWRAP_VOLATILES=0";
 
 my @clang_opts = (
     "-O0 ",
@@ -131,15 +133,14 @@ my @ALL_SWARM_OPTS = (
 
 #########################################################
 
-my $PIN_ADDR_FILE = "vol_addr.txt";
-my $PIN_BIN = "$PIN_HOME/pin.sh -injection child -t $PIN_HOME/source/tools/ManualExamples/obj-intel64/pinatrace.so -vol_input $PIN_ADDR_FILE";
+my $PIN_BIN = "$PIN_HOME/pin.sh -injection child -t $PIN_HOME/source/tools/ManualExamples/obj-intel64/pinatrace.so";
 my $CSMITH_BIN = "$CSMITH_HOME/src/csmith";
 my $CSMITH_VOL_OPTS = "";
 
 my $MIN_PROGRAM_SIZE = 30000;
 my $COMPILER_TIMEOUT = 600;
 my $PROG_TIMEOUT = 5;
-my $PIN_PROG_TIMEOUT = 30;
+my $PIN_PROG_TIMEOUT = 300;
 my $CSMITH_TIMEOUT = 180; 
 my $TIMEOUT_RES = 137;
 #on darwin timeout res is 152 instead of 137
@@ -156,6 +157,7 @@ sub print_msg($) {
 
 sub runit ($) {
   my $cmd = shift;
+  # print "runit: $cmd\n";
   if ((system "$cmd") == -1) {
     print "FAIL: system '$cmd': $?";
     return -1;
@@ -198,7 +200,7 @@ sub get_seed($) {
 }
 
 sub run_csmith($$) {
-  my ($cfile, $redirect_output) = @_;
+  my ($cfile, $check_size) = @_;
 
   my $SWARM_OPTS = "";
   if ($USE_SWARM) {
@@ -216,7 +218,7 @@ sub run_csmith($$) {
   my $res = runit($csmith_cmd);
   if (($res != 0) || !(-f "$cfile")) {
     print STDERR "CSMITH FAILED\n";
-    system "cat csmith_output.txt" if ($redirect_output);
+    system "cat csmith_output.txt";
     if (-f "$cfile") {
       my $seed = get_seed($cfile);
       print STDERR "Seed = $seed\n";
@@ -225,7 +227,7 @@ sub run_csmith($$) {
   }
 
   # for checking pre-reqs
-  return 0 if (!$redirect_output);
+  return 0 if (!$check_size);
 
   my $filesize = stat("$cfile")->size;
   print "$cfile is $filesize bytes\n";
@@ -267,8 +269,8 @@ sub run_csmith($$) {
   }
 }
 
-sub compile_cfile($$$$$$) {
-  my ($arch, $compiler_cmd, $compiler_opt, $cfile, $exe, $redirect_output) = @_;
+sub compile_cfile($$$$$) {
+  my ($arch, $compiler_cmd, $compiler_opt, $cfile, $exe) = @_;
 
   my $compiler_out = "$exe.out";
   my $cmd = "$RunSafely $COMPILER_TIMEOUT 1 /dev/null $compiler_out $compiler_cmd $compiler_opt $COMPILER_COMMON_OPTS -I$CSMITH_HOME/runtime $cfile -o $exe";
@@ -276,9 +278,9 @@ sub compile_cfile($$$$$$) {
   my $res = runit($cmd);
   if ($res || !(-f $exe)) {
     if ($res == $TIMEOUT_RES) {
-      print STDERR "COMPILER FAILURE: TIMEOUT\n" if ($redirect_output);
+      print STDERR "COMPILER FAILURE: TIMEOUT\n";
     }
-    elsif ($redirect_output) {
+    else {
       print STDERR "COMPILER FAILURE with return code $res; output is:\n";
       open INF, "<$compiler_out" or die;
       while (my $line = <INF>) { print "  $line"; }
@@ -288,22 +290,21 @@ sub compile_cfile($$$$$$) {
   return $res;
 }
 
-sub run_exe($$$$) {
-  my ($exe, $compiler, $raw_out, $redirect_output) = @_;
- 
+sub run_exe_with_pin($$$$) {
+  my ($pin_cmd, $exe, $compiler, $raw_out) = @_;
+
   my $res = runit("$RunSafely $PROG_TIMEOUT 1 /dev/null $raw_out ./$exe");
   if ($res == 0) {
-    my $pin_cmd = "$RunSafely $PIN_PROG_TIMEOUT 1 /dev/null $raw_out $PIN_BIN $PIN_OUTPUT_MODE $PIN_SEED $PIN_RANDOM_READ -- ./$exe";
-    print "$pin_cmd\n";
-    $res = runit($pin_cmd);
+    my $cmd = "$RunSafely $PIN_PROG_TIMEOUT 1 /dev/null $raw_out $pin_cmd -- ./$exe";
+    print "$cmd\n";
+    $res = runit($cmd);
   }
 
   if ($res == $TIMEOUT_RES) {
-    print STDERR "TIMEOUT\n" if ($redirect_output);
+    print STDERR "TIMEOUT\n";
   }
   elsif ($res != 0) {
-    print STDERR "UNEXPECTED $compiler PROGRAM FAIL, retval = ${res}\n" 
-      if ($redirect_output);
+    print STDERR "UNEXPECTED $compiler PROGRAM FAIL, retval = ${res}\n";
   }
   return $res;
 }
@@ -414,121 +415,136 @@ sub parse_output($) {
   return ($checksum, $vol_str);
 }
 
+sub run_exe($$$$$$) {
+  my ($pin_cmd, $exe, $compiler, $opt, $vol_results_ref, $csums_ref) = @_;
+
+  my $raw_out = "$exe.raw-out";
+  my $res = run_exe_with_pin($pin_cmd, $exe, $compiler, $raw_out);
+
+  if ($res == $TIMEOUT_RES) {
+    my $timeout = "TIMEOUT";
+    $vol_results_ref->{$opt} = $timeout;
+    $csums_ref->{$opt} = $timeout;
+    # print "$timeout\n";
+    return $res;
+  }
+  elsif ($res != 0) {
+    print STDERR "couldn't compute access summary\n";
+    return -1;
+  }
+
+  system "grep 'cpu time' ${exe}.raw-out.time";
+  my ($checksum, $vol_str) = parse_output($raw_out);
+  if (!defined($checksum)) {
+    print STDERR "couldn't get checksum!\n";
+    return -1;
+  }
+  print "$vol_str" if (defined($vol_str));
+  print "checksum = $checksum\n";
+
+  $vol_results_ref->{$opt} = $vol_str;
+  $csums_ref->{$opt} = $checksum;
+  return 0;
+}
+
+sub check_internal_consistency($$$) {
+  my ($compiler, $vol_results_ref, $csums_ref) = @_;
+  my $consistent = 1;
+  my $vol_result;
+  my $csum;
+
+  foreach my $opt (keys %$vol_results_ref) {
+    if (defined($vol_result)) {
+      my $curr_sum = $csums_ref->{$opt};
+      if (($csum ne $curr_sum) &&
+          ($csum ne "TIMEOUT" && $curr_sum ne "TIMEOUT")) {
+        print "INTERNAL CHECKSUM FAILURE $compiler $opt\n";
+        $consistent = 0;
+        last;
+      }
+      if ($vol_result ne $vol_results_ref->{$opt}) {
+        print "INTERNAL VOLATILE FAILURE $compiler $opt\n";
+        $consistent = 0;
+        last;
+      }
+    }
+    else {
+      $vol_result = $vol_results_ref->{$opt};
+      $csum = $csums_ref->{$opt};
+    }
+  }
+  return ($consistent, $vol_result, $csum);
+}
+
+sub check_external_consistency($$$$) {
+  my ($vol_result, $tmp_vol_result, $csum, $tmp_csum) = @_;
+
+  if ($vol_result ne $tmp_vol_result) {
+    print "EXTERNAL VOLATILE FAILURE\n";
+  }
+  if (($csum ne $tmp_csum) &&
+      ($csum ne "TIMEOUT") &&
+      ($tmp_csum ne "TIMEOUT")) {
+    print "EXTERNAL CHECKSUM FAILURE\n";
+  }
+}
+
 sub test_one_compiler($$$) {
-  my ($root, $compiler_ref, $checker_out) = @_;
+  my ($root, $compiler_ref, $checker_vols_out) = @_;
 
   my ($arch, undef, $compiler, $optref) = @{$compiler_ref};
   my @OPTS = @{$optref};
   print "--------------------\n";
 
-  my %vol_results;
-  my %csums;
-
   my $success = 0;
   my $compiler_fail = 0;
 
+  my %vol_results;
+  my %csums;
   foreach my $opt (@OPTS) {
     my $cfile = "$root.c";
     my $exe = get_exe_filename($root, $compiler, $opt);
-    if (compile_cfile($arch, $compiler, $opt, $cfile, $exe, 1) != 0) {
+    if (compile_cfile($arch, $compiler, $opt, $cfile, $exe) != 0) {
       $compiler_fail++;
       next;
     }
 
-    my $res = runit("$GEN_VOLATILE_ADDR --vars-file=$checker_out $exe > $PIN_ADDR_FILE 2>&1");
+    my $vol_addrs_out = "${exe}.vols.addrs.out";
+    my $res = runit("$GEN_VOLATILE_ADDR --vars-file=$checker_vols_out $exe > $vol_addrs_out 2>&1");
     if ($res != 0) {
       print STDERR "$GEN_VOLATILE_ADDR failed to run\n";
       return (1, undef, undef, undef);
     }
 
-    my $raw_out = "$exe.raw-out";
-    $res = run_exe($exe, $compiler, $raw_out, 0);
-    if (-f "$PIN_ADDR_FILE") {
-      system("mv $PIN_ADDR_FILE ${exe}_vol_addr.txt");
-    }
-    if ($res == $TIMEOUT_RES) {
-      my $timeout = "TIMEOUT";
-      $vol_results{$opt} = $timeout;
-      $csums{$opt} = $timeout;
-      print "$timeout\n";
-      next;
-    }
-    elsif ($res != 0) {
-      print STDERR "couldn't compute access summary\n";
-      return (1, undef, undef, undef);
-    }
-
-    system "grep 'cpu time' ${exe}.raw-out.time";
+    my $pin_cmd = "$PIN_BIN -vol_input $vol_addrs_out $PIN_OUTPUT_MODE $PIN_SEED $PIN_RANDOM_READ";
+    $res = run_exe($pin_cmd, $exe, $compiler, $opt, \%vol_results, \%csums);
+    next if ($res == $TIMEOUT_RES);
+    return (1, undef, undef, undef) if ($res);
     $success++;
-    my ($checksum, $vol_str) = parse_output($raw_out);
-    if (!defined($checksum)) {
-      print STDERR "couldn't get checksum!\n";
-      return (1, undef, undef, undef);
-    }
-    print "$vol_str" if (defined($vol_str));
-    print "checksum = $checksum\n";
-
-    $vol_results{$opt} = $vol_str;
-    $csums{$opt} = $checksum;
   }
-
-  my $vol_result;
-  my $csum;
-  my $writes;
 
   if ($compiler_fail > 0) {
     print "COMPILER FAILED $compiler\n";
   }
 
   if ($success > 0) {
-    my $consistent = 1;
-    foreach my $opt (keys %vol_results) {
-      if (defined($vol_result)) {
-        if (($csum ne $csums{$opt}) &&
-            ($csum ne "TIMEOUT" && $csums{$opt} ne "TIMEOUT")) {
-          print "INTERNAL CHECKSUM FAILURE $compiler $opt\n";
-          $consistent = 0;
-          last;
-        }
-        if ($vol_result ne $vol_results{$opt}) {
-          print "INTERNAL VOLATILE FAILURE $compiler $opt\n";
-          $consistent = 0;
-          last;
-        }
-      }
-      else {
-        $vol_result = $vol_results{$opt};
-        $csum = $csums{$opt};
-      }
-    }
+    my ($consistent, $vol_result, $csum) = check_internal_consistency($compiler, \%vol_results, \%csums);
     return (0, $consistent, $vol_result, $csum);
   }
   else {
-    return (0, 0, $vol_result, $csum);
+    return (0, 0, undef, undef);
   }
 }
 
-sub test_one_program($) {
-  my ($root) = @_;
+sub do_normal_test($$) {
+  my ($root, $checker_vols_out) = @_;
 
   my $vol_result;
   my $csum;
 
-  my $checker_out = "$root.checker.out";
-  my $res = runit("gcc -E -I$CSMITH_HOME/runtime $root.c > ${root}.pre.i 2>&1");
-  if ($res) {
-    print STDERR "preprocessor FAILED!\n";
-    return -1;
-  }
-  $res = runit("$CHECKER --checker=volatile-address $root.pre.i > $checker_out 2>&1");
-  if ($res) {
-    print STDERR "volatile_checker FAILURE\n";
-    return -1;
-  }
-
   foreach my $compiler_ref (@compilers_to_test) {
     (my $abort_test, my $consistent, my $tmp_vol_result, my $tmp_csum) =
-        test_one_compiler ($root, $compiler_ref, $checker_out);
+        test_one_compiler ($root, $compiler_ref, $checker_vols_out);
 
     return -1 if ($abort_test);
 
@@ -540,20 +556,250 @@ sub test_one_program($) {
 
     if (defined ($vol_result) &&
         defined ($csum)) {
-
-      if ($vol_result ne $tmp_vol_result) {
-        print "EXTERNAL VOLATILE FAILURE\n";
-      }
-      if (($csum ne $tmp_csum) &&
-          ($csum ne "TIMEOUT") &&
-          ($tmp_csum ne "TIMEOUT")) {
-        print "EXTERNAL CHECKSUM FAILURE\n";
-      }
-    } else {
+      check_external_consistency($vol_result, $tmp_vol_result, 
+                                 $csum, $tmp_csum);
+    }
+    else {
       $vol_result = $tmp_vol_result;
       $csum = $tmp_csum;
     }
   }
+}
+
+sub get_full_name($) {
+  my ($line) = @_;
+
+  my @a = split(';', $line);
+  die "bad line:$line" unless((@a == 4) || (@a == 5));
+  my $name = $a[0];
+  $name =~ s/[\s\t]//g;
+  return $name;
+}
+
+sub add_one_var($$$) {
+  my ($line, $visited_names_ref, $all_vars_ref) = @_;
+
+  my $name = get_full_name($line);
+
+  # we have something like the following due to bitfields:
+  # (g_93+0).f0; 0x40c188; 2; non-pointer
+  # (g_93+0).f0; 0x40c18a; 1; non-pointer; e0
+  # only need to count the name once for this case,
+  # otherwise, uniq_all_addrs_files will be broken
+  my $visited = $visited_names_ref->{$name};
+  return if (defined($visited));
+
+  $visited_names_ref->{$name} = 1;
+  my $count = $all_vars_ref->{$name};
+  if (defined($count)) {
+    $all_vars_ref->{$name} = $count+1;
+  }
+  else {
+    $all_vars_ref->{$name} = 1;
+  }
+}
+
+sub filter_globals($$$) {
+  my ($fname, $all_addrs_files_ref, $all_vars_ref) = @_;
+
+  # print "file:$fname\n";
+  my %visited_names = ();
+  my @all_lines = ();
+  my $s = "";
+  open INF, "<$fname" or die "cannot open $fname!";
+  while (my $line = <INF>) {
+    chomp $line;
+    if ($line =~ m/^[(\s\t]*g_/) {
+      $s .= "$line\n";
+      add_one_var($line, \%visited_names, $all_vars_ref);
+      push @all_lines, $line;
+    }
+  }
+  close INF;
+  @all_lines = sort @all_lines;
+  $all_addrs_files_ref->{$fname} = \@all_lines;
+=comment
+  open OUT, ">$fname" or die "cannot open $fname!";
+  print OUT $s;
+  close OUT;
+=cut
+}
+
+# compilers may not emit globals in an object, e.g.
+# static const int g_1 = 0;
+# the object code generated by clang won't have reference
+# to g_1; however, gcc does. 
+# Therefore, we only keep common vars appearing all objects.
+# also, we need to sort these common vars
+sub uniq_all_addrs_files($$) {
+  my ($all_addrs_files_ref, $all_vars_ref) = @_;
+
+  my $num_files = scalar(keys %$all_addrs_files_ref);
+
+  foreach my $file (keys %$all_addrs_files_ref) {
+    my $file_lines = $all_addrs_files_ref->{$file};
+    my $s = "";
+    foreach my $line (@$file_lines) {
+      my $name = get_full_name($line);  
+      my $count = $all_vars_ref->{$name};
+      die "undef name:$name!" unless (defined($count));
+      # print "$name, $count, $num_files\n";
+      if ($count == $num_files) {
+        $s .= "$line\n";
+      }
+    }
+    close INF;
+    open OUT, ">$file" or die "cannot open $file!";
+    print OUT $s;
+    close OUT;
+  }
+}
+
+# only invoke one compiler;
+# delay the process of running exes
+sub invoke_one_compiler($$$$$$$) {
+  my ($root, $compiler_ref, $checker_vols_out, 
+      $checker_all_addrs_out, $all_addrs_files_ref, 
+      $all_pin_cmds_ref, $all_vars_ref) = @_;
+
+  my ($arch, undef, $compiler, $optref) = @{$compiler_ref};
+  my @all_cmds = ();
+  my @OPTS = @{$optref};
+  my $compiler_fail = 0;
+
+  foreach my $opt (@OPTS) {
+    my $cfile = "$root.c";
+    my $exe = get_exe_filename($root, $compiler, $opt);
+    if (compile_cfile($arch, $compiler, $opt, $cfile, $exe) != 0) {
+      $compiler_fail++;
+      next;
+    }
+
+    my $vol_addrs_out = "${exe}.vols.addrs.out";
+    my $all_addrs_out = "${exe}.all.addrs.out";
+    my $res = runit("$GEN_VOLATILE_ADDR --vars-file=$checker_vols_out --all-vars-file=$checker_all_addrs_out --all-var-addrs-output=$all_addrs_out $exe > $vol_addrs_out 2>&1");
+    if ($res != 0) {
+      print STDERR "$GEN_VOLATILE_ADDR failed to run\n";
+      return -1;
+    }
+
+    filter_globals($all_addrs_out, $all_addrs_files_ref, $all_vars_ref);
+    my $pin_cmd = "$PIN_BIN -vol_input $vol_addrs_out -all_vars_input $all_addrs_out $PIN_OUTPUT_MODE $PIN_SEED $PIN_RANDOM_READ";
+    push @all_cmds, [$pin_cmd, $exe, $opt];
+  }
+
+  if ($compiler_fail > 0) {
+    print "COMPILER FAILED $compiler\n";
+  }
+
+  $all_pin_cmds_ref->{$compiler} = \@all_cmds;
+  return 0;
+}
+
+sub run_one_compiler_exes($$) {
+  my ($compiler, $exes_array_ref) = @_;
+
+  my $success = 0;
+  my %vol_results = ();
+  my %csums = ();
+
+  foreach my $elem (@$exes_array_ref) {
+    my ($pin_cmd, $exe, $opt) = @$elem;
+    my $res = run_exe($pin_cmd, $exe, $compiler, $opt, \%vol_results, \%csums);
+    next if ($res == $TIMEOUT_RES);
+    return (1, undef, undef, undef) if ($res);
+    $success++;
+  }
+
+  if ($success > 0) {
+    my ($consistent, $vol_result, $csum) = check_internal_consistency($compiler, \%vol_results, \%csums);
+    return (0, $consistent, $vol_result, $csum);
+  }
+  else {
+    return (0, 0, undef, undef);
+  }
+}
+
+=comment
+First compile the cfile with all compilers,
+then grab common vars which appear in 
+all of the nm outputs.
+The reason is that a compiler could simply 
+*not* generate an unused (literally unused or
+by its analysis) into the object code.  
+If we pass all vars to the pin runtime,
+we will `wrongfully' compute checksums.
+=cut
+sub do_test_without_printing_checksum($$$) {
+  my ($root, $checker_vols_out, $checker_all_addrs_out) = @_;
+
+  my %all_addrs_files = ();
+  my %all_vars = ();
+  my %all_pin_cmds = ();
+
+  foreach my $compiler_ref (@compilers_to_test) {
+    invoke_one_compiler($root, $compiler_ref, $checker_vols_out, 
+                    $checker_all_addrs_out, \%all_addrs_files, 
+                    \%all_pin_cmds, \%all_vars);
+  }
+  uniq_all_addrs_files(\%all_addrs_files, \%all_vars);
+
+  my $vol_result;
+  my $csum;
+  foreach my $compiler (keys %all_pin_cmds) {
+    my $exes = $all_pin_cmds{$compiler};
+    (my $abort_test, my $consistent, my $tmp_vol_result, my $tmp_csum) =
+      run_one_compiler_exes($compiler, $exes);
+
+    return -1 if ($abort_test);
+    print "COMPLETED TEST $compiler\n";
+    # ignore internally inconsistent results
+    next if (!$consistent);
+
+    if (defined ($vol_result) &&
+        defined ($csum)) {
+      check_external_consistency($vol_result, $tmp_vol_result, 
+                                 $csum, $tmp_csum);
+    } 
+    else {
+      $vol_result = $tmp_vol_result;
+      $csum = $tmp_csum;
+    }
+  }
+}
+
+sub test_one_program($) {
+  my ($root) = @_;
+
+  my $vol_result;
+  my $csum;
+
+  my $checker_vols_out = "$root.checker.vols.out";
+  my $checker_all_addrs_out = "";
+  my $extra_checker_opt = "";
+  if ($NOT_PRINT_CHECKSUM) {
+    $checker_all_addrs_out = "$root.checker.all.out";
+    $extra_checker_opt = "--all-vars-output=$checker_all_addrs_out";
+  }
+
+  my $res = runit("gcc -E -I$CSMITH_HOME/runtime $root.c > ${root}.pre.i 2>&1");
+  if ($res) {
+    print STDERR "preprocessor FAILED!\n";
+    return -1;
+  }
+  $res = runit("$CHECKER --checker=volatile-address $extra_checker_opt $root.pre.i > $checker_vols_out 2>&1");
+  if ($res) {
+    print STDERR "volatile_checker FAILURE\n";
+    return -1;
+  }
+
+  if ($NOT_PRINT_CHECKSUM) {
+    do_test_without_printing_checksum($root, $checker_vols_out, $checker_all_addrs_out);
+  }
+  else {
+    do_normal_test($root, $checker_vols_out);
+  }
+
   return 0;
 }
 
@@ -604,13 +850,16 @@ sub go_test() {
 ################################################################################
 
 my $help_msg = '
-Usage: volatile_test.pl --work-dir=[dir] --pin-output-mode=[checksum|verbose|summary] --enable-pin-random-read
+Usage: volatile_test.pl --work-dir=[dir] --pin-output-mode=[checksum|verbose|summary]
   Options:
   --work-dir=[dir]: specify the work-dir (default: work0)
+  --not-print-checksum: random programs will not print checksums, 
+                        instead, checksums will be computed at runtime by the pintool
   --pin-output-mode=[checksum|verbose|summary]: specify the output mode of the pintool (default: checksum)
   --enable-pin-random-read: enable pintool to inject random values to volatile reads
   --iteration=[num]: specify how many testing runs (default: 100000000)
   --disable-swarm: disable swarm options
+  --keep-temps: keep temprary dirs
   --no-vol-struct-union-fields: disable struct/union fields
   --strict-volatile-rule: enable Csmith to generate programs with respect to one-vol-access-between-two-seq-points rule
   --help: this message
@@ -670,7 +919,12 @@ sub check_prereqs() {
   print_msg("checking gen_volatile_addr.pl...\n");
   $GEN_VOLATILE_ADDR = "gen_volatile_addr.pl";
   if (runit("$GEN_VOLATILE_ADDR --help > /dev/null 2>&1")) {
-    die "failed to run $GEN_VOLATILE_ADDR!";
+    print_msg("$GEN_VOLATILE_ADDR is not in PATH env\n");
+    print_msg("one more try...\n");
+    $GEN_VOLATILE_ADDR = "$cwd/gen_volatile_addr.pl";
+    if (runit("$GEN_VOLATILE_ADDR --help > /dev/null 2>&1")) {
+      die "failed to run $GEN_VOLATILE_ADDR!";
+    }
   }
   print_msg("succedded\n");
 
@@ -688,18 +942,35 @@ sub check_prereqs() {
   my $csmith_ok = 0;
   my $test_case_ok = 0;
   my $run_exe_ok = 0;
-  my $checker_out = "checker.addr.out";
+  my $checker_vols_out = "checker.addrs.out";
+  my $checker_all_addrs_out = "";
+  my $extra_checker_opt = "";
+  my $vol_addrs_out = "vol.addrs.out";
+  my $all_addrs_out = "";
+  my $extra_gen_addr_opt = "";
+  my $pin_extra_opt = "";
+
+  if ($NOT_PRINT_CHECKSUM) {
+    $checker_all_addrs_out = "checker.all.addrs.out";
+    $all_addrs_out = "all.addrs.out";
+    $extra_checker_opt = "--all-vars-output=$checker_all_addrs_out";
+    $extra_gen_addr_opt = "--all-vars-file=$checker_all_addrs_out --all-var-addrs-output=$all_addrs_out";
+    $pin_extra_opt = "-all_vars_input $all_addrs_out"; 
+    $COMPILER_COMMON_OPTS .= " -DNOT_PRINT_CHECKSUM";
+  }
+
   while ($tries > 0) {
     $tries--;
     next if (run_csmith($cfile, 0));
     $csmith_ok = 1;
     my $res = runit("gcc -E -I$CSMITH_HOME/runtime $cfile > $preprocessed_cfile 2>&1");
-    next if (compile_cfile("ia32", "gcc", "-O0", $preprocessed_cfile, $exe, 0));
-    next if (runit("$CHECKER --checker=volatile-address $preprocessed_cfile > $checker_out 2>&1"));
-    next if (runit("$GEN_VOLATILE_ADDR --vars-file=$checker_out $exe > $PIN_ADDR_FILE 2>&1"));
+    next if (compile_cfile("ia32", "gcc", "-O0", $preprocessed_cfile, $exe));
+    next if (runit("$CHECKER --checker=volatile-address $extra_checker_opt $preprocessed_cfile > $checker_vols_out 2>&1"));
+    next if (runit("$GEN_VOLATILE_ADDR --vars-file=$checker_vols_out $extra_gen_addr_opt $exe > $vol_addrs_out 2>&1"));
     $test_case_ok = 1;
     my $raw_out = "$exe.raw-out";
-    if (run_exe($exe, "gcc", $raw_out, 0) == 0) {
+    my $pin_cmd = "$PIN_BIN -vol_input $vol_addrs_out $pin_extra_opt $PIN_OUTPUT_MODE $PIN_SEED $PIN_RANDOM_READ";
+    if (run_exe_with_pin($pin_cmd, $exe, "gcc", $raw_out) == 0) {
       $run_exe_ok = 1;
       last;
     }
@@ -754,6 +1025,12 @@ sub main() {
       }
       elsif ($1 eq "strict-volatile-rule") {
         $CSMITH_VOL_OPTS .= "$1 ";
+      }
+      elsif ($1 eq "not-print-checksum") {
+        $NOT_PRINT_CHECKSUM = 1;
+      }
+      elsif ($1 eq "keep-temps") {
+        $KEEP_TEMPS = 1;
       }
       elsif ($1 eq "disable-swarm") {
         $USE_SWARM = 0;
