@@ -218,6 +218,7 @@ sub run_csmith($$) {
   my $res = runit($csmith_cmd);
   if (($res != 0) || !(-f "$cfile")) {
     print STDERR "CSMITH FAILED\n";
+    print STDERR "$cmd\n";
     system "cat csmith_output.txt";
     if (-f "$cfile") {
       my $seed = get_seed($cfile);
