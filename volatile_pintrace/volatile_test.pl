@@ -382,7 +382,7 @@ sub parse_verbose_output(*) {
     chomp $line;
     if ($line =~ m/checksum[\s\t]*=[\s\t]*([0-9a-fA-F]+)/) {
       if (defined($checksum)) {
-        print STDERR "ERROR: duplicated checksum!\n";
+        print STDERR "POSSIBLE PINTOOL FAILURE: duplicated checksum!\n";
         return (undef, undef) 
       }
       $checksum = $1;
@@ -838,7 +838,9 @@ sub do_one_test($) {
 
 out:
   chdir "../..";
-  system "rm -rf $dir";
+  if (!$KEEP_TEMPS) {
+    system "rm -rf $dir";
+  }
 }
 
 sub go_test() {
@@ -957,7 +959,7 @@ sub check_prereqs() {
     $extra_checker_opt = "--all-vars-output=$checker_all_addrs_out";
     $extra_gen_addr_opt = "--all-vars-file=$checker_all_addrs_out --all-var-addrs-output=$all_addrs_out";
     $pin_extra_opt = "-all_vars_input $all_addrs_out"; 
-    $COMPILER_COMMON_OPTS .= " -DUSE_PIN_CHECKSUMS";
+    $COMPILER_COMMON_OPTS .= " -DNOT_PRINT_CHECKSUM";
   }
 
   while ($tries > 0) {
