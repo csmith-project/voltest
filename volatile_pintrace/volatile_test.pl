@@ -21,11 +21,11 @@ my $PIN_SEED = "";
 my $PIN_RANDOM_READ = "";
 my $WORKING_DIR = "work0";
 #my $ITERATION = 100000000;
-my $ITERATION = 10;
+my $ITERATION = 500;
 my $USE_SWARM = 1;
 my $VERBOSE = 1;
 my $KEEP_TEMPS = 0;
-my $NOT_PRINT_CHECKSUM = 0;
+my $USE_PIN_CHECKSUMS = 0;
 my $CHECKER;
 my $GEN_VOLATILE_ADDR;
 my $RunSafely;
@@ -777,7 +777,7 @@ sub test_one_program($) {
   my $checker_vols_out = "$root.checker.vols.out";
   my $checker_all_addrs_out = "";
   my $extra_checker_opt = "";
-  if ($NOT_PRINT_CHECKSUM) {
+  if ($USE_PIN_CHECKSUMS) {
     $checker_all_addrs_out = "$root.checker.all.out";
     $extra_checker_opt = "--all-vars-output=$checker_all_addrs_out";
   }
@@ -793,7 +793,7 @@ sub test_one_program($) {
     return -1;
   }
 
-  if ($NOT_PRINT_CHECKSUM) {
+  if ($USE_PIN_CHECKSUMS) {
     do_test_without_printing_checksum($root, $checker_vols_out, $checker_all_addrs_out);
   }
   else {
@@ -853,8 +853,8 @@ my $help_msg = '
 Usage: volatile_test.pl --work-dir=[dir] --pin-output-mode=[checksum|verbose|summary]
   Options:
   --work-dir=[dir]: specify the work-dir (default: work0)
-  --not-print-checksum: random programs will not print checksums, 
-                        instead, checksums will be computed at runtime by the pintool
+  --use-pin-checksums: random programs will not print checksums, 
+                       instead, checksums will be computed at runtime by the pintool
   --pin-output-mode=[checksum|verbose|summary]: specify the output mode of the pintool (default: checksum)
   --enable-pin-random-read: enable pintool to inject random values to volatile reads
   --iteration=[num]: specify how many testing runs (default: 100000000)
@@ -950,13 +950,13 @@ sub check_prereqs() {
   my $extra_gen_addr_opt = "";
   my $pin_extra_opt = "";
 
-  if ($NOT_PRINT_CHECKSUM) {
+  if ($USE_PIN_CHECKSUMS) {
     $checker_all_addrs_out = "checker.all.addrs.out";
     $all_addrs_out = "all.addrs.out";
     $extra_checker_opt = "--all-vars-output=$checker_all_addrs_out";
     $extra_gen_addr_opt = "--all-vars-file=$checker_all_addrs_out --all-var-addrs-output=$all_addrs_out";
     $pin_extra_opt = "-all_vars_input $all_addrs_out"; 
-    $COMPILER_COMMON_OPTS .= " -DNOT_PRINT_CHECKSUM";
+    $COMPILER_COMMON_OPTS .= " -DUSE_PIN_CHECKSUMS";
   }
 
   while ($tries > 0) {
@@ -1026,8 +1026,8 @@ sub main() {
       elsif ($1 eq "strict-volatile-rule") {
         $CSMITH_VOL_OPTS .= "$1 ";
       }
-      elsif ($1 eq "not-print-checksum") {
-        $NOT_PRINT_CHECKSUM = 1;
+      elsif ($1 eq "use-pin-checksums") {
+        $USE_PIN_CHECKSUMS = 1;
       }
       elsif ($1 eq "keep-temps") {
         $KEEP_TEMPS = 1;
