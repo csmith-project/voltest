@@ -18,7 +18,7 @@ while (<INF>) {
 close INF;
 
 sub usage () {
-  die "usage: launchn.pl [--not-print-checksum] [--cpus=number] [--nice=number]\n";
+  die "usage: launchn.pl [--use-pin-checksums] [--cpus=number] [--nice=number]\n";
 }
 
 my $NOT_PRINT_CHECKSUM = "";
@@ -41,9 +41,9 @@ while(defined ($opt = shift @ARGV)) {
     }
   }
   elsif ($opt =~ m/^--(.+)$/) {
-    if ($1 eq "not-print-checksum") {
-      usage() if ($1 !~ m/not-print-checksum/);
-      $NOT_PRINT_CHECKSUM = "--not-print-checksum";
+    if ($1 eq "use-pin-checksums") {
+      usage() if ($1 !~ m/use-pin-checksums/);
+      $NOT_PRINT_CHECKSUM = "--use-pin-checksums";
     }
     else {
       usage();
