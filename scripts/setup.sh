@@ -260,6 +260,7 @@ sudo apt-get $quiet -y install \
   libbenchmark-timer-perl \
   libexporter-lite-perl \
   libfile-which-perl \
+  libgetopt-tabular-perl \
   libregexp-common-perl \
   libsys-cpu-perl
 
