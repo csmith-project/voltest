@@ -21,7 +21,7 @@ export PIN_HOME
 # Old driver:
 #   PATH="$CSMITH_HOME/utah/scripts/old_john_driver:$PATH"
 # New driver:
-PATH="$VOLATILE_PINTRACE_HOME:$PATH"
+PATH="$VOLATILE_PINTRACE_HOME:$VOLATILE_CHECKER_HOME:$PATH"
 export PATH
 
 ###############################################################################
