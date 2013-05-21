@@ -59,7 +59,7 @@ mkdir "$WORK_RUN_HOME"
 time=`date +%H:%M:%S`
 echo "*** [$time]" "Setting up Csmith..."
 
-# Get Cmith.
+# Get Csmith.
 #
 time=`date +%H:%M:%S`
 echo "*** [$time]" "  Acquiring Csmith sources..."
@@ -279,6 +279,20 @@ echo "*** [$time]" "  Compiling C-Reduce..."
 #
 make > Make.errs 2>&1
 # make install
+
+###############################################################################
+
+## SET UP FRAMA-C
+
+time=`date +%H:%M:%S`
+echo "*** [$time]" "Setting up Frama-C..."
+
+# Install Frama-C.  The "frama-c" package has many, many dependencies.
+#
+time=`date +%H:%M:%S`
+echo "*** [$time]" "  Installing Frama-C..."
+#
+sudo apt-get $quiet -y install frama-c
 
 ###############################################################################
 

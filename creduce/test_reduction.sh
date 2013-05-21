@@ -29,12 +29,15 @@ CPPFLAGS="-DINLINE= -DCSMITH_MINIMAL -DWRAP_VOLATILES=0 -DNOT_PRINT_CHECKSUM -I/
 
 TIMEOUT=5
 
+TIMEOUT_FRAMAC=125
+
 ###############################################################################
 
 ## Environment configuration.
 
 CLANG=/local/randtest/src/llvm-install/bin/clang
 CMP=cmp
+FRAMAC=/usr/bin/frama-c
 GCC=gcc
 GREP=grep
 RM=rm
@@ -235,6 +238,38 @@ $RUNSAFELY $TIMEOUT 1 /dev/null "$asan_exe_out" \
   > /dev/null 2>&1
 if [ $? -ne 0 ]; then
   $QUIET_ECHO "$0: clang -fsanitize=address: program is unsanitary"
+  $NEAT_RM_OUTS
+  exit 1
+fi
+
+###############################################################################
+
+## Use Frama-C to weed out "broken" programs.
+
+framac_out=framac-out.txt
+
+# perl -pi.bak -e 's/int main \(int argc, char\* argv\[\]\)/int argc; char **argv; int main (void)/' small-framac.c &&\
+
+$RUNSAFELY $TIMEOUT_FRAMAC 1 /dev/null "$framac_out" \
+$FRAMAC \
+  -cpp-command "gcc -C -Dvolatile= -E -I." \
+  -val-signed-overflow-alarms -val -stop-at-first-alarm -no-val-show-progress \
+  -machdep x86_64 \
+  -obviously-terminates \
+  -precise-unions small-framac.c \
+  > /dev/null 2>&1
+if [ $? -ne 0 ]; then
+  $QUIET_ECHO "$0: Frama-C failed to vet the program"
+  $NEAT_RM_OUTS
+  exit 1
+fi
+
+$GREP -q \
+  -e 'user error' \
+  -e 'assert' \
+  "$framac_out"
+if [ $? -ne 1 ]; then
+  $QUIET_ECHO "$0: unacceptable output warning from Frama-C"
   $NEAT_RM_OUTS
   exit 1
 fi
