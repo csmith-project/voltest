@@ -29,12 +29,15 @@ CPPFLAGS="-DINLINE= -DCSMITH_MINIMAL -DWRAP_VOLATILES=0 -DNOT_PRINT_CHECKSUM -I/
 
 TIMEOUT=5
 
+TIMEOUT_FRAMAC=125
+
 ###############################################################################
 
 ## Environment configuration.
 
 CLANG=/local/randtest/src/llvm-install/bin/clang
 CMP=cmp
+FRAMAC=/usr/bin/frama-c
 GCC=gcc
 GREP=grep
 RM=rm
@@ -110,7 +113,7 @@ if [ $quiet -ne 0 ]; then
   QUIET_ECHO=:
 fi
 
-NEAT_RM_OUTS="$RM -f *out*.exe *out*.txt"
+NEAT_RM_OUTS="$RM -f *out*.exe *out*.txt framac-prog.c"
 if [ $neat -eq 0 ]; then
   NEAT_RM_OUTS=:
 fi
@@ -235,6 +238,60 @@ $RUNSAFELY $TIMEOUT 1 /dev/null "$asan_exe_out" \
   > /dev/null 2>&1
 if [ $? -ne 0 ]; then
   $QUIET_ECHO "$0: clang -fsanitize=address: program is unsanitary"
+  $NEAT_RM_OUTS
+  exit 1
+fi
+
+###############################################################################
+
+## Use Frama-C to weed out "broken" programs.
+
+framac_filename=framac-prog.c
+framac_out=framac-out.txt
+
+# For whatever reason, Frama-C does not like `main' to have arguments!
+#
+cp "$filename" "$framac_filename"
+if [ $? -ne 0 ]; then
+  $QUIET_ECHO "$0: failed to copy \"$filename\" for Frama-C"
+  $NEAT_RM_OUTS
+  exit 1
+fi
+
+perl -pi \
+  -e 's/int main \(int argc, char\* argv\[\]\)/int argc; char **argv; int main (void)/' \
+  "$framac_filename"
+if [ $? -ne 0 ]; then
+  $QUIET_ECHO "$0: failed to edit \"$framac_filename\" for Frama-C"
+  $NEAT_RM_OUTS
+  exit 1
+fi
+
+# XXX: `RunSafely' has some serious problems with shell quoting!
+# Note the funky (basically, wrong) quoting of the -cpp-command value, which is
+# needed to get it through RunSafely.  Fix RunSafely.
+#
+$RUNSAFELY $TIMEOUT_FRAMAC 1 /dev/null "$framac_out" \
+$FRAMAC \
+  -cpp-command \"gcc -C -Dvolatile= -E -I.\" \
+  -val-signed-overflow-alarms -val -stop-at-first-alarm -no-val-show-progress \
+  -machdep x86_64 \
+  -obviously-terminates \
+  -precise-unions \
+  "$framac_filename" \
+  > /dev/null 2>&1
+if [ $? -ne 0 ]; then
+  $QUIET_ECHO "$0: Frama-C failed to vet the program"
+  $NEAT_RM_OUTS
+  exit 1
+fi
+
+$GREP -q \
+  -e 'user error' \
+  -e 'assert' \
+  "$framac_out"
+if [ $? -ne 1 ]; then
+  $QUIET_ECHO "$0: unacceptable output warning from Frama-C"
   $NEAT_RM_OUTS
   exit 1
 fi
