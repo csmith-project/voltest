@@ -62,9 +62,11 @@ echo "*** [$time]" "Setting up Csmith..."
 # Get Csmith.
 #
 time=`date +%H:%M:%S`
-echo "*** [$time]" "  Acquiring Csmith sources..."
+echo "*** [$time]" "  Acquiring Csmith sources (@ $CSMITH_REV)..."
 #
-git clone $quiet "$CSMITH_GIT" "$CSMITH_HOME"
+git clone $quiet "$CSMITH_GIT" --no-checkout "$CSMITH_HOME"
+cd "$CSMITH_HOME"
+git checkout $quiet --detach "$CSMITH_REV"
 
 # Install things required by test driver scripts.
 #
@@ -121,9 +123,10 @@ echo "*** [$time]" "Setting up volatile_pintrace..."
 # Get volatile_pintrace.
 #
 time=`date +%H:%M:%S`
-echo "*** [$time]" "  Acquiring volatile_pintrace sources..."
-
-svn co $quiet "$VOLATILE_PINTRACE_SVN" "$VOLATILE_PINTRACE_HOME"
+echo "*** [$time]" "  Acquiring volatile_pintrace sources (@ $VOLATILE_PINTRACE_REV)..."
+#
+svn co $quiet --revision "$VOLATILE_PINTRACE_REV" \
+  "$VOLATILE_PINTRACE_SVN" "$VOLATILE_PINTRACE_HOME"
 
 # Get Pin.  Assumes that PIN_HOME == "$WORK_SRC_DIR/$PIN_DIR".
 #
@@ -244,9 +247,11 @@ echo "*** [$time]" "Setting up C-Reduce..."
 # Get C-Reduce.
 #
 time=`date +%H:%M:%S`
-echo "*** [$time]" "  Acquiring C-Reduce sources..."
+echo "*** [$time]" "  Acquiring C-Reduce sources (@ $CREDUCE_REV)..."
 #
-git clone $quiet "$CREDUCE_GIT" "$CREDUCE_HOME"
+git clone $quiet "$CREDUCE_GIT" --no-checkout "$CREDUCE_HOME"
+cd "$CREDUCE_HOME"
+git checkout $quiet --detach "$CREDUCE_REV"
 
 # Install things required by C-Reduce.
 #
@@ -304,9 +309,10 @@ echo "*** [$time]" "Setting up volatile_checker..."
 # Get volatile_checker.
 #
 time=`date +%H:%M:%S`
-echo "*** [$time]" "  Acquiring volatile_checker sources..."
-
-svn co $quiet "$VOLATILE_CHECKER_SVN" "$VOLATILE_CHECKER_HOME"
+echo "*** [$time]" "  Acquiring volatile_checker sources (@ $VOLATILE_CHECKER_REV)..."
+#
+svn co $quiet  --revision "$VOLATILE_CHECKER_REV" \
+  "$VOLATILE_CHECKER_SVN" "$VOLATILE_CHECKER_HOME"
 
 # Compile as directed by `volatile_checker/README.txt'.
 #

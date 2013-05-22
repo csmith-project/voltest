@@ -27,9 +27,8 @@ CREDUCE_GIT=git@github.com:csmith-project/creduce.git
 
 CREDUCE_HOME="$WORK_SRC_HOME/$CREDUCE_DIR"
 
-# What C-Reduce commit to use?
-# XXX Not yet implemented.
-CREDUCE_REV=HEAD
+# What C-Reduce branch, tag, or commit to use?
+CREDUCE_REV=master
 
 ###############################################################################
 
@@ -42,9 +41,8 @@ CSMITH_GIT=git@github.com:csmith-project/csmith.git
 
 CSMITH_HOME="$WORK_SRC_HOME/$CSMITH_DIR"
 
-# What Csmith commit to use?
-# XXX Not yet implemented.
-CSMITH_REV=HEAD
+# What Csmith branch, tag, or commit to use?
+CSMITH_REV=master
 
 ###############################################################################
 
@@ -88,28 +86,28 @@ PIN_URL="http://software.intel.com/sites/landingpage/pintool/downloads/$PIN_TGZ"
 ## VOLATILE_CHECKER
 
 VOLATILE_CHECKER_DIR=volatile_checker
-VOLATILE_CHECKER_HOME="$WORK_SRC_HOME/$VOLATILE_CHECKER_DIR"
-
-# What volatile_checker revision to use?
-# XXX Not yet implemented.
-VOLATILE_CHECKER_REV=
 
 # Where to download volatile_checker from, via SVN.
 VOLATILE_CHECKER_SVN=svn+ssh://shell.cs.utah.edu/uusoc/res/embed/users/regehr/embedded_code_repo/yang/volatile_checker
+
+VOLATILE_CHECKER_HOME="$WORK_SRC_HOME/$VOLATILE_CHECKER_DIR"
+
+# What volatile_checker revision to use?
+VOLATILE_CHECKER_REV=HEAD
 
 ###############################################################################
 
 ## VOLATILE_PINTRACE
 
 VOLATILE_PINTRACE_DIR=volatile_pintrace
-VOLATILE_PINTRACE_HOME="$WORK_SRC_HOME/$VOLATILE_PINTRACE_DIR"
-
-# What volatile_pintrace revision to use?
-# XXX Not yet implemented.
-VOLATILE_PINTRACE_REV=
 
 # Where to download volatile_pintrace from, via SVN.
 VOLATILE_PINTRACE_SVN=svn+ssh://shell.cs.utah.edu/uusoc/res/embed/users/regehr/embedded_code_repo/yang/volatile_pintrace
+
+VOLATILE_PINTRACE_HOME="$WORK_SRC_HOME/$VOLATILE_PINTRACE_DIR"
+
+# What volatile_pintrace revision to use?
+VOLATILE_PINTRACE_REV=HEAD
 
 ###############################################################################
 
