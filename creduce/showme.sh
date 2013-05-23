@@ -155,6 +155,7 @@ $GREP -q \
   -e 'incompatible pointer to' \
   -e 'incompatible integer to' \
   -e 'type specifier missing' \
+  -e 'discards qualifiers' \
   "$clang_out"
 if [ $? -ne 1 ]; then
   $QUIET_ECHO "$0: unacceptable output warning from clang"
@@ -193,6 +194,7 @@ $GREP -q \
   -e 'incompatible implicit' \
   -e 'excess elements in struct initializer' \
   -e 'comparison between pointer and integer' \
+  -e "discards '.*' qualifier" \
   "$gcc_out"
 if [ $? -ne 1 ]; then
   $QUIET_ECHO "$0: unacceptable output warning from gcc"
