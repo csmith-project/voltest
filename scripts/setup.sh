@@ -26,6 +26,10 @@ set -e
 set -u
 
 # If you want a bunch of noise, set "quiet=" and "silent=".
+#
+# Note: To make `apt-get' really quiet, one must use "-q -q".  This script
+# does not do that, mostly.
+#
 quiet=-q
 silent=-s
 
@@ -51,6 +55,18 @@ chmod ug+rwx "$WORK_HOME"
 mkdir "$WORK_SRC_HOME"
 
 mkdir "$WORK_RUN_HOME"
+
+###############################################################################
+
+## SET UP APT-GET
+
+time=`date +%H:%M:%S`
+echo "*** [$time]" "Running \`apt-get update'..."
+
+# Make sure that this node's package lists are up to date.
+# Avoid very boring output by being very quiet ($quiet $quiet).
+#
+sudo apt-get $quiet $quiet -y update
 
 ###############################################################################
 
@@ -216,12 +232,15 @@ cd "$LLVM_OBJ_HOME"
 "$LLVM_SRC_HOME"/configure --prefix="$LLVM_HOME" > Configure.errs
 
 # Compile.
+## LLVM 3.2
 # make      : This takes about 120   minutes on a pc3000.
 # make -j2  : This takes about  82   minutes on a pc3000.
 # make      : This takes about  50   minutes on a d710.
 # make -j4  : This takes about  15   minutes on a d710.
 # make -j8  : This takes about  12   minutes on a d710.
 # make -j64 : This takes about   3.5 minutes on a d820.
+## LLVM 3.3
+# make -j64 : This takes about   4 minutes on a d820.
 #
 time=`date +%H:%M:%S`
 echo "*** [$time]" "  Compiling LLVM+Clang+Compiler-RT (-j$ncpus)..."
