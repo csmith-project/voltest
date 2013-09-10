@@ -8,7 +8,7 @@ source tb_compat.tcl
 
 set imp [$ns node]
 tb-set-hardware $imp d820
-tb-set-node-os $imp UBUNTU12-64-STD-UPD
+tb-set-node-os $imp UBUNTU12-64-STD
 
 set fs [$ns blockstore]
 $fs set-class local
