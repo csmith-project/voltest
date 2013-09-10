@@ -48,17 +48,17 @@ CSMITH_REV=master
 
 ## LLVM AND ITS PARTS
 
-LLVM_DIR=llvm-3.2.src
-LLVM_TGZ=llvm-3.2.src.tar.gz
-LLVM_URL="http://llvm.org/releases/3.2/$LLVM_TGZ"
+LLVM_DIR=llvm-3.3.src
+LLVM_TGZ=llvm-3.3.src.tar.gz
+LLVM_URL="http://llvm.org/releases/3.3/$LLVM_TGZ"
 #
-LLVM_CLANG_DIR=clang-3.2.src
-LLVM_CLANG_TGZ=clang-3.2.src.tar.gz
-LLVM_CLANG_URL="http://llvm.org/releases/3.2/$LLVM_CLANG_TGZ"
+LLVM_CLANG_DIR=cfe-3.3.src
+LLVM_CLANG_TGZ=cfe-3.3.src.tar.gz
+LLVM_CLANG_URL="http://llvm.org/releases/3.3/$LLVM_CLANG_TGZ"
 #
-LLVM_COMPILER_RT_DIR=compiler-rt-3.2.src
-LLVM_COMPILER_RT_TGZ=compiler-rt-3.2.src.tar.gz
-LLVM_COMPILER_RT_URL="http://llvm.org/releases/3.2/$LLVM_COMPILER_RT_TGZ"
+LLVM_COMPILER_RT_DIR=compiler-rt-3.3.src
+LLVM_COMPILER_RT_TGZ=compiler-rt-3.3.src.tar.gz
+LLVM_COMPILER_RT_URL="http://llvm.org/releases/3.3/$LLVM_COMPILER_RT_TGZ"
 
 # Somehwat confusing.
 # LLVM_SRC_HOME is the source tree; LLVM_OBJ_HOME is the build tree;
