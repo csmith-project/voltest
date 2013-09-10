@@ -10,6 +10,12 @@ set imp [$ns node]
 tb-set-hardware $imp d820
 tb-set-node-os $imp UBUNTU12-64-STD-UPD
 
+set fs [$ns blockstore]
+$fs set-class local
+$fs set-placement NONSYSVOL
+$fs set-mount-point /disk2
+$fs set-node $imp
+
 $ns rtproto Static
 $ns run
 
