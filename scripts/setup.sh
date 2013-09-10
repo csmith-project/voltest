@@ -26,12 +26,11 @@ set -e
 set -u
 
 # If you want a bunch of noise, set "quiet=" and "silent=".
-#
-# Note: To make `apt-get' really quiet, one must use "-q -q".  This script
-# does not do that, mostly.
-#
 quiet=-q
 silent=-s
+
+# To make `apt-get' be really quiet, one must use "-q -q".
+very_quiet="$quiet $quiet"
 
 ncpus=1
 if test -e /proc/cpuinfo; then
@@ -64,9 +63,8 @@ time=`date +%H:%M:%S`
 echo "*** [$time]" "Running \`apt-get update'..."
 
 # Make sure that this node's package lists are up to date.
-# Avoid very boring output by being very quiet ($quiet $quiet).
 #
-sudo apt-get $quiet $quiet -y update
+sudo apt-get $very_quiet -y update
 
 ###############################################################################
 
@@ -89,8 +87,8 @@ git checkout $quiet --detach "$CSMITH_REV"
 time=`date +%H:%M:%S`
 echo "*** [$time]" "  Installing Csmith dependencies..."
 #
-sudo apt-get $quiet -y install libsys-cpu-perl
-sudo apt-get $quiet -y install liblockfile-simple-perl
+sudo apt-get $very_quiet -y install libsys-cpu-perl
+sudo apt-get $very_quiet -y install liblockfile-simple-perl
 
 # Building in a separate object tree sets up a failure later on because
 # the `evaluate_program.pl' script expects to find `csmith.h' and whatnot in
@@ -277,7 +275,7 @@ git checkout $quiet --detach "$CREDUCE_REV"
 time=`date +%H:%M:%S`
 echo "*** [$time]" "  Installing C-Reduce dependencies..."
 #
-sudo apt-get $quiet -y install \
+sudo apt-get $very_quiet -y install \
   astyle \
   delta \
   indent \
@@ -316,7 +314,7 @@ echo "*** [$time]" "Setting up Frama-C..."
 time=`date +%H:%M:%S`
 echo "*** [$time]" "  Installing Frama-C..."
 #
-sudo apt-get $quiet -y install frama-c
+sudo apt-get $very_quiet -y install frama-c
 
 ###############################################################################
 
