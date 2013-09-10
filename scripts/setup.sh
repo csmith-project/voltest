@@ -297,9 +297,9 @@ cd "$CREDUCE_HOME"
 # Compile.
 #
 time=`date +%H:%M:%S`
-echo "*** [$time]" "  Compiling C-Reduce..."
+echo "*** [$time]" "  Compiling C-Reduce (-j$ncpus)..."
 #
-make > Make.errs 2>&1
+make -j"$ncpus" > Make.errs 2>&1
 # make install
 
 ###############################################################################
