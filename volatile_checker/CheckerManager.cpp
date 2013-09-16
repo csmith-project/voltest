@@ -71,7 +71,7 @@ bool CheckerManager::initializeCompilerInstance(
   IntrusiveRefCntPtr<DiagnosticIDs> DiagID(new DiagnosticIDs());
   DiagnosticsEngine Diags(DiagID, &*DiagOpts, DiagClient);
   Driver TheDriver(Path, llvm::sys::getDefaultTargetTriple(),
-                   "a.out", /*IsProduction=*/false, Diags);
+                   "a.out", Diags);
   TheDriver.setTitle(Args[0]);
 
   OwningPtr<Compilation> Comp(TheDriver.BuildCompilation(Args));
@@ -100,8 +100,7 @@ bool CheckerManager::initializeCompilerInstance(
   ClangInstance->setInvocation(CI.take());
 
   // Create the compilers actual diagnostics engine.
-  ClangInstance->createDiagnostics(int(CCArgs.size()),
-                                   const_cast<char**>(CCArgs.data()));
+  ClangInstance->createDiagnostics();
   CheckerAssert(ClangInstance->hasDiagnostics() && 
                 "failed to create Diagnostics!");
 #if 0
@@ -127,7 +126,7 @@ bool CheckerManager::initializeCompilerInstance(
   TargetOpts.Triple = LLVM_DEFAULT_TARGET_TRIPLE;
   TargetInfo *Target = 
     TargetInfo::CreateTargetInfo(ClangInstance->getDiagnostics(),
-                                 TargetOpts);
+                                 &TargetOpts);
   ClangInstance->setTarget(Target);
   ClangInstance->createFileManager();
   ClangInstance->createSourceManager(ClangInstance->getFileManager());
@@ -256,7 +255,7 @@ int CheckerManager::doChecking(std::string &ErrorMsg)
 {
   Preprocessor &PP = ClangInstance->getPreprocessor();
   PreprocessingRecord *PPCallbacks = 
-    new PreprocessingRecord(ClangInstance->getSourceManager(), true);
+    new PreprocessingRecord(ClangInstance->getSourceManager());
   PP.addPPCallbacks(PPCallbacks);
 
   ClangInstance->createSema(TU_Complete, 0);
