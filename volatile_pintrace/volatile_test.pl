@@ -26,6 +26,7 @@ my $USE_SWARM = 1;
 my $VERBOSE = 1;
 my $KEEP_TEMPS = 0;
 my $USE_PIN_CHECKSUMS = 0;
+my $USE_SEQUENTIAL_SEEDS = 0;
 my $CHECKER;
 my $GEN_VOLATILE_ADDR;
 my $RunSafely;
@@ -199,8 +200,8 @@ sub get_seed($) {
   }
 }
 
-sub run_csmith($$) {
-  my ($cfile, $check_size) = @_;
+sub run_csmith($$$) {
+  my ($cfile, $n, $check_size) = @_;
 
   my $SWARM_OPTS = "";
   if ($USE_SWARM) {
@@ -213,7 +214,11 @@ sub run_csmith($$) {
     }
   }
 
-  my $cmd = "$CSMITH_BIN $SWARM_OPTS $CSMITH_VOL_OPTS --output $cfile";
+  my $seed_opts = "";
+  if ($USE_SEQUENTIAL_SEEDS && ($n >= 0)) {
+    $seed_opts = "--seed $n";
+  }
+  my $cmd = "$CSMITH_BIN $SWARM_OPTS $CSMITH_VOL_OPTS $seed_opts --output $cfile";
   my $csmith_cmd = "$RunSafely $CSMITH_TIMEOUT 1 /dev/null csmith_output.txt $cmd";
   my $res = runit($csmith_cmd);
   if (($res != 0) || !(-f "$cfile")) {
@@ -826,7 +831,7 @@ sub do_one_test($) {
 
   my $fn = "rand$nstr";
   my $cfile = "${fn}.c";
-  goto out if (run_csmith($cfile, 1) != 0);
+  goto out if (run_csmith($cfile, $n, 1) != 0);
   my $res = test_one_program($fn);
   if ($res == 0) {
     print "GOOD PROGRAM: number $GOOD\n";
@@ -964,7 +969,7 @@ sub check_prereqs() {
 
   while ($tries > 0) {
     $tries--;
-    next if (run_csmith($cfile, 0));
+    next if (run_csmith($cfile, -1, 0));
     $csmith_ok = 1;
     my $res = runit("gcc -E -I$CSMITH_HOME/runtime $cfile > $preprocessed_cfile 2>&1");
     next if (compile_cfile("ia32", "gcc", "-O0", $preprocessed_cfile, $exe));
@@ -1037,6 +1042,9 @@ sub main() {
       }
       elsif ($1 eq "disable-swarm") {
         $USE_SWARM = 0;
+      }
+      elsif ($1 eq "use-sequential-seeds") {
+        $USE_SEQUENTIAL_SEEDS = 1;
       }
       elsif ($1 eq "help") {
         print $help_msg;
