@@ -873,6 +873,7 @@ Usage: volatile_test.pl --work-dir=[dir] --pin-output-mode=[checksum|verbose|sum
   --keep-temps: keep temprary dirs
   --no-vol-struct-union-fields: disable struct/union fields
   --strict-volatile-rule: enable Csmith to generate programs with respect to one-vol-access-between-two-seq-points rule
+  --use-sequential-seeds: use numbers [0, n-1] as the seeds to Csmith, where n is specified by --iteration=n
   --help: this message
 ';
 
