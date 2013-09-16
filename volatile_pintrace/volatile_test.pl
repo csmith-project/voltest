@@ -340,20 +340,28 @@ sub parse_summary_output(*) {
 
   my $checksum = undef;
   my $vol_str = "";
+  my $pintool_seed = undef;
   while (my $line = <HANDLE>) {
     chomp $line;
     if ($line =~ m/checksum[\s\t]*=[\s\t]*([0-9a-fA-F]+)/) {
       if (defined($checksum)) {
         print STDERR "ERROR: duplicated checksum!\n";
-        return (undef, undef) 
+        return (undef, undef, undef); 
       }
       $checksum = $1;
+    }
+    elsif ($line =~ m/pintool_seed[\s\t]*=[\s\t]*([0-9a-fA-F]+)/) {
+      if (defined($pintool_seed)) {
+        print STDERR "ERROR: duplicated pintool_seed!\n";
+        return (undef, undef, undef); 
+      }
+      $pintool_seed = $1;
     }
     elsif ($line =~ m/&(.+)\s*:\s*([0-9]+)\s*:\s*([0-9]+)\s*reads,\s*([0-9]+)\s*writes/) {
       $vol_str .= "$line\n";
     }
   }
-  return ($checksum, $vol_str);
+  return ($checksum, $vol_str, $pintool_seed);
 }
 
 sub parse_checksum_output(*) {
@@ -361,24 +369,32 @@ sub parse_checksum_output(*) {
 
   my $checksum = undef;
   my $vol_str = undef;
+  my $pintool_seed = undef;
   while (my $line = <HANDLE>) {
     chomp $line;
     if ($line =~ m/vol_access_checksum[\s\t]*=[\s\t]*([0-9a-fA-F]+)/) {
       if (defined($vol_str)) {
         print STDERR "ERROR: duplicated vol_access_checksum!\n";
-        return (undef, undef) 
+        return (undef, undef, undef); 
       }
       $vol_str = "vol_access_checksum = $1\n";
+    }
+    elsif ($line =~ m/pintool_seed[\s\t]*=[\s\t]*([0-9a-fA-F]+)/) {
+      if (defined($pintool_seed)) {
+        print STDERR "ERROR: duplicated pintool_seed!\n";
+        return (undef, undef, undef); 
+      }
+      $pintool_seed = $1;
     }
     elsif ($line =~ m/checksum[\s\t]*=[\s\t]*([0-9a-fA-F]+)/) {
       if (defined($checksum)) {
         print STDERR "ERROR: duplicated checksum!\n";
-        return (undef, undef) 
+        return (undef, undef, undef);
       }
       $checksum = $1;
     }
   }
-  return ($checksum, $vol_str);
+  return ($checksum, $vol_str, $pintool_seed);
 }
 
 sub parse_verbose_output(*) {
@@ -386,20 +402,28 @@ sub parse_verbose_output(*) {
 
   my $checksum = undef;
   my $vol_str = "";
+  my $pintool_seed = undef;
   while (my $line = <HANDLE>) {
     chomp $line;
     if ($line =~ m/checksum[\s\t]*=[\s\t]*([0-9a-fA-F]+)/) {
       if (defined($checksum)) {
         print STDERR "POSSIBLE PINTOOL FAILURE: duplicated checksum!\n";
-        return (undef, undef) 
+        return (undef, undef, undef) 
       }
       $checksum = $1;
+    }
+    elsif ($line =~ m/pintool_seed[\s\t]*=[\s\t]*([0-9a-fA-F]+)/) {
+      if (defined($pintool_seed)) {
+        print STDERR "ERROR: duplicated pintool_seed!\n";
+        return (undef, undef, undef); 
+      }
+      $pintool_seed = $1;
     }
     elsif ($line =~ m/name:&(.+),\s*read from addr:\s*([0-9a-fA-F]+),\s*value:\s*([0-9a-fA-F]+)/) {
       $vol_str .= "$line\n";
     }
   }
-  return ($checksum, $vol_str);
+  return ($checksum, $vol_str, $pintool_seed);
 }
 
 sub parse_output($) {
@@ -407,25 +431,26 @@ sub parse_output($) {
 
   my $checksum; 
   my $vol_str;
+  my $pintool_seed;
   open INF, "<$out" or die;
   if ($PIN_OUTPUT_MODE =~ m/summary/) {
-    ($checksum, $vol_str) = parse_summary_output(*INF);
+    ($checksum, $vol_str, $pintool_seed) = parse_summary_output(*INF);
   }
   elsif ($PIN_OUTPUT_MODE =~ m/checksum/) {
-    ($checksum, $vol_str) = parse_checksum_output(*INF);
+    ($checksum, $vol_str, $pintool_seed) = parse_checksum_output(*INF);
   }
   elsif ($PIN_OUTPUT_MODE =~ m/verbose/) {
-    ($checksum, $vol_str) = parse_verbose_output(*INF);
+    ($checksum, $vol_str, $pintool_seed) = parse_verbose_output(*INF);
   }
   else {
     die "Cannot happen: invalid PIN_OUTPUT_MODE[$PIN_OUTPUT_MODE]!";
   }
   close INF;
-  return ($checksum, $vol_str);
+  return ($checksum, $vol_str, $pintool_seed);
 }
 
-sub run_exe($$$$$$) {
-  my ($pin_cmd, $exe, $compiler, $opt, $vol_results_ref, $csums_ref) = @_;
+sub run_exe($$$$$$$) {
+  my ($pin_cmd, $exe, $compiler, $opt, $vol_results_ref, $csums_ref, $pintool_seeds_ref) = @_;
 
   my $raw_out = "$exe.raw-out";
   my $res = run_exe_with_pin($pin_cmd, $exe, $compiler, $raw_out);
@@ -443,16 +468,18 @@ sub run_exe($$$$$$) {
   }
 
   system "grep 'cpu time' ${exe}.raw-out.time";
-  my ($checksum, $vol_str) = parse_output($raw_out);
+  my ($checksum, $vol_str, $pintool_seed) = parse_output($raw_out);
   if (!defined($checksum)) {
     print STDERR "couldn't get checksum!\n";
     return -1;
   }
   print "$vol_str" if (defined($vol_str));
   print "checksum = $checksum\n";
+  print "pintool_seed = $pintool_seed\n" if (defined($pintool_seed));
 
   $vol_results_ref->{$opt} = $vol_str;
   $csums_ref->{$opt} = $checksum;
+  $pintool_seeds_ref->{$opt} = $pintool_seed;
   return 0;
 }
 
@@ -510,6 +537,9 @@ sub test_one_compiler($$$) {
 
   my %vol_results;
   my %csums;
+  my %pintool_seeds;
+  my $first = 1;
+  my $pintool_seed = undef;
   foreach my $opt (@OPTS) {
     my $cfile = "$root.c";
     my $exe = get_exe_filename($root, $compiler, $opt);
@@ -526,7 +556,11 @@ sub test_one_compiler($$$) {
     }
 
     my $pin_cmd = "$PIN_BIN -vol_input $vol_addrs_out $PIN_OUTPUT_MODE $PIN_SEED $PIN_RANDOM_READ";
-    $res = run_exe($pin_cmd, $exe, $compiler, $opt, \%vol_results, \%csums);
+    $res = run_exe($pin_cmd, $exe, $compiler, $opt, \%vol_results, \%csums, \%pintool_seeds);
+    if (($PIN_RANDOM_READ ne "") && ($PIN_SEED eq "") && $first) {
+      $PIN_SEED = "-seed $pintool_seeds{$opt}";
+    }
+    $first = 0;
     next if ($res == $TIMEOUT_RES);
     return (1, undef, undef, undef) if ($res);
     $success++;
@@ -711,10 +745,16 @@ sub run_one_compiler_exes($$) {
   my $success = 0;
   my %vol_results = ();
   my %csums = ();
+  my %pintool_seeds = ();
 
+  my $first = 1;
   foreach my $elem (@$exes_array_ref) {
     my ($pin_cmd, $exe, $opt) = @$elem;
-    my $res = run_exe($pin_cmd, $exe, $compiler, $opt, \%vol_results, \%csums);
+    my $res = run_exe($pin_cmd, $exe, $compiler, $opt, \%vol_results, \%csums, \%pintool_seeds);
+    if (($PIN_RANDOM_READ ne "") && ($PIN_SEED eq "") && $first) {
+      $PIN_SEED = "-seed $pintool_seeds{$opt}";
+    }
+    $first = 0;
     next if ($res == $TIMEOUT_RES);
     return (1, undef, undef, undef) if ($res);
     $success++;
@@ -1013,7 +1053,7 @@ sub main() {
         $PIN_OUTPUT_MODE = "-output_mode $2";
       }
       elsif ($1 eq "pin-seed") {
-        $PIN_SEED = $2;
+        $PIN_SEED = "-seed $2";
       }
       elsif ($1 eq "work-dir") {
         $WORKING_DIR = $2;
