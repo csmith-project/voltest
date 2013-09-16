@@ -20,6 +20,8 @@ Volatile tests howto:
      TARGET=ia32 make
     )
 
+  * make sure to RunSafely is in the PATH env;
+
   To do volatile tests using volatile scripts, you only need to 
   setup CSMITH_HOME, and either:
 
