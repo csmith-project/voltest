@@ -770,7 +770,7 @@ int main(int argc, char *argv[])
         seed = KnobSeed.Value();
         if (!seed)
             seed = GenSeed();
-        fprintf(stdout, "seed=%lu\n", seed);
+        fprintf(stdout, "pintool_seed=%lu\n", seed);
         srand48(seed);
     }
 
