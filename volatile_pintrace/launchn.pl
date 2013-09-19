@@ -8,7 +8,7 @@ use Sys::CPU;
 
 my $NICE = "";
 
-open INF, "ps axu |" or die;
+open INF, "ps axuww |" or die;
 while (<INF>) {
   if (/volatile\_test/) {
     print "oops-- kill existing volatile_test.pl processes first!\n";
@@ -18,9 +18,10 @@ while (<INF>) {
 close INF;
 
 sub usage () {
-  die "usage: launchn.pl [--use-pin-checksums] [--cpus=number] [--nice=number]\n";
+  die "usage: launchn.pl [--cpus=number] [--nice=number] [-- <args to volatile_test.pl>]\n";
 }
 
+my @VOLATILE_TEST_ARGS = ();
 my $NOT_PRINT_CHECKSUM = "";
 my $CPUS = undef;
 
@@ -40,14 +41,10 @@ while(defined ($opt = shift @ARGV)) {
       usage();
     }
   }
-  elsif ($opt =~ m/^--(.+)$/) {
-    if ($1 eq "use-pin-checksums") {
-      usage() if ($1 !~ m/use-pin-checksums/);
-      $NOT_PRINT_CHECKSUM = "--use-pin-checksums";
-    }
-    else {
-      usage();
-    }
+  elsif ($opt =~ m/^--$/) {
+    # Everything after "--" passes thru to volatile_test.pl
+    @VOLATILE_TEST_ARGS = @ARGV;
+    @ARGV = ();
   }
   else {
     usage();
@@ -64,6 +61,6 @@ system "rm -rf work*";
 for (my $i=0; $i<$CPUS; $i++) {
   my $dir = "work$i";
   system "mkdir $dir";
-  system "$NICE nohup volatile_test.pl $NOT_PRINT_CHECKSUM --work-dir=$dir > $dir/output.txt 2>&1 &";
+  system "$NICE nohup volatile_test.pl @VOLATILE_TEST_ARGS --work-dir=$dir > $dir/output.txt 2>&1 &";
 }
 
