@@ -52,7 +52,10 @@ static uint32_t vol_crc32_tab[256];
 static uint32_t vol_crc32_context = 0xFFFFFFFFUL;
 static uint32_t crc32_tab[256];
 static uint32_t crc32_context = 0xFFFFFFFFUL;
+static uint32_t ordered_crc32_tab[256];
+static uint32_t ordered_crc32_context = 0xFFFFFFFFUL;
 static uint64_t seed;
+static vector<string> ordered_byte_accesses;
 
 static uint64_t GenSeed(void)
 {
@@ -111,6 +114,32 @@ static void DumpChecksum()
 {
     cout << "vol_access_checksum = " << uppercase << hex << (vol_crc32_context ^ 0xFFFFFFFFUL) << "\n";
 }
+
+static void ComputeChecksumOnString(const string &s, uint32_t *context, uint32_t *tab)
+{
+  unsigned int i;
+  unsigned len = s.length();
+  for (i = 0; i < len; i++) {
+    Crc32(s[i], context, tab);
+  }
+}
+
+static void ComputeByteAccessChecksum(const string &name, const string &m, unsigned int value)
+{
+  ComputeChecksumOnString(name, &ordered_crc32_context, ordered_crc32_tab);
+  ComputeChecksumOnString(m, &ordered_crc32_context, ordered_crc32_tab);
+  Crc32(value, &ordered_crc32_context, ordered_crc32_tab);
+}
+
+enum OUTPUT_MODE {
+    M_CHECKSUM,
+    M_SUMMARY,
+    M_VERBOSE,
+    M_ORDERED_CHECKSUM,
+    M_ORDERED_VERBOSE,
+};
+
+static enum OUTPUT_MODE output_mode = M_CHECKSUM;
 
 class VolElem {
 public:
@@ -283,7 +312,15 @@ VolElem::add_byte_values(ADDRINT addr, size_t sz, unsigned int mode)
         ss << "name:" << name_ << ", ";
         ss << m << " addr: " << hex << (addr+i) << ", ";
         ss << "value: " << hex << value << endl;
-        byte_values_.push_back(ss.str());
+        if (output_mode == M_VERBOSE) {
+          byte_values_.push_back(ss.str());
+        }
+        else if (output_mode == M_ORDERED_VERBOSE) {
+          ordered_byte_accesses.push_back(ss.str());
+        }
+        else if (output_mode == M_ORDERED_CHECKSUM) {
+          ComputeByteAccessChecksum(name_, m, value);
+        }
     }
 }
 
@@ -333,14 +370,6 @@ static BOOL enable_random_reads = FALSE;
 
 static BOOL enable_debugging_messages = FALSE;
 
-enum OUTPUT_MODE {
-    M_CHECKSUM,
-    M_SUMMARY,
-    M_VERBOSE,
-};
-
-static enum OUTPUT_MODE output_mode = M_CHECKSUM;
-
 KNOB<string> KnobInputFile(KNOB_MODE_WRITEONCE, "pintool",
     "vol-input", "", "specify input file which contains volatile addresses");
 
@@ -348,7 +377,7 @@ KNOB<string> KnobAllVarInputFile(KNOB_MODE_WRITEONCE, "pintool",
     "all-vars-input", "", "specify input file which contains all var addresses");
 
 KNOB<string> KnobOutputMode(KNOB_MODE_WRITEONCE, "pintool",
-    "output-mode", "checksum", "specify the dump mode [checksum|summary|verbose]");
+    "output-mode", "checksum", "specify the dump mode [checksum|summary|verbose|ordered_checksum|ordered_verbose]");
 
 KNOB<BOOL> KnobRandomRead(KNOB_MODE_WRITEONCE, "pintool",
     "random-read", "0", "feed a random values to a volatile read");
@@ -560,6 +589,20 @@ static void DumpVolTable()
         DumpChecksum();
 }
 
+static void DumpVerboseOrderedAccesses()
+{
+    vector<string>::iterator i;
+
+    for(i = ordered_byte_accesses.begin(); i != ordered_byte_accesses.end(); ++i) {
+        cout << (*i);
+    }
+}
+
+static void DumpOrderedChecksum()
+{
+    cout << "ordered_access_checksum = " << uppercase << hex << (ordered_crc32_context ^ 0xFFFFFFFFUL) << "\n";
+}
+
 static void FiniVolTable()
 {
     VolElem *elem;
@@ -609,7 +652,9 @@ static void RecordMem(ADDRINT addr, ADDRINT sz, unsigned int mode)
                 assert("bad mode!" && 0);
             }
       
-            if (output_mode == M_VERBOSE) {
+            if ((output_mode == M_VERBOSE) || 
+                (output_mode == M_ORDERED_VERBOSE) ||
+                (output_mode == M_ORDERED_CHECKSUM)) {
                 elem->add_byte_values(addr, sz, mode);
             }
 
@@ -719,7 +764,15 @@ VOID Fini(INT32 code, VOID *v)
       FiniVolTable();
       exit(-1);
     }
-    DumpVolTable();
+    if (output_mode == M_ORDERED_CHECKSUM) {
+      DumpOrderedChecksum();
+    }
+    else if (output_mode == M_ORDERED_VERBOSE) {
+      DumpVerboseOrderedAccesses();
+    }
+    else {
+      DumpVolTable();
+    }
     FiniVolTable();
 }
 
@@ -733,6 +786,13 @@ static int SetOutputMode(const string &mode)
     }
     else if (!mode.compare("verbose")) {
         output_mode = M_VERBOSE;
+    }
+    else if (!mode.compare("ordered_checksum")) {
+        output_mode = M_ORDERED_CHECKSUM;
+        Crc32Gentab(ordered_crc32_tab);
+    }
+    else if (!mode.compare("ordered_verbose")) {
+        output_mode = M_ORDERED_VERBOSE;
     }
     else {
         cerr << "Invalid output mode: " << mode << endl;
