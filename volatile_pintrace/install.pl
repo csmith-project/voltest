@@ -18,7 +18,7 @@ sub abort_if_fail ($) {
       die "FAILED: system '$cmd': $?";
   }
   my $exit_value  = $? >> 8;
-  return $exit_value;
+  die "FAIL: system '$cmd': $exit_value";
 }
 
 sub chdir_or_die($) {
