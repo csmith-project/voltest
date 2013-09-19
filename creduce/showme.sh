@@ -300,11 +300,16 @@ fi
 
 ###############################################################################
 
-## Extract information about the volatiles in the program.
+## Extract information about the volatiles (and all variables) in the program.
 
+all_vars=all-vars-out.txt
 vol_vars=vol-vars-out.txt
 
-$VOL_CHECKER --checker=volatile-address "$filename" > "$vol_vars" 2>&1
+$VOL_CHECKER \
+  --checker=volatile-address \
+  --all-vars-output="$all_vars" \
+  "$filename" \
+  > "$vol_vars" 2>&1
 if [ $? -ne 0 ]; then
   $QUIET_ECHO "$0: volatile-variable extractor failed"
   $NEAT_RM_OUTS
@@ -330,11 +335,15 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# The addresses of volatile locations in the program produced by the first
-# compiler under test.
+# The addresses of volatile locations (and normal locations, too) in the
+# program produced by the first compiler under test.
+ccut1_exe_all_addrs=ccut1-exe-all-addrs-out.txt
 ccut1_exe_vol_addrs=ccut1-exe-vol-addrs-out.txt
 
-$VOL_ADDR_GEN --vars-file="$vol_vars" \
+$VOL_ADDR_GEN \
+  --vars-file="$vol_vars" \
+  --all-vars-file="$all_vars" \
+  --all-var-addrs-output="$ccut1_exe_all_addrs" \
   "$ccut1_exe" \
   > "$ccut1_exe_vol_addrs" 2>&1
 if [ $? -ne 0 ]; then
@@ -351,6 +360,7 @@ $RUNSAFELY $TIMEOUT 1 /dev/null "$ccut1_exe_out" \
   -injection child \
   -t "$PIN_HOME/source/tools/ManualExamples/obj-intel64/pinatrace.so" \
   -vol_input "$ccut1_exe_vol_addrs" \
+  -all_vars_input "$ccut1_exe_all_addrs" \
   -output_mode checksum \
   -- "$ccut1_exe" \
   > /dev/null 2>&1
@@ -400,11 +410,15 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# The addresses of volatile locations in the program produced by the second
-# compiler under test.
+# The addresses of volatile locations (and normal locations, too) in the
+# program produced by the second compiler under test.
+ccut2_exe_all_addrs=ccut2-exe-all-addrs-out.txt
 ccut2_exe_vol_addrs=ccut2-exe-vol-addrs-out.txt
 
-$VOL_ADDR_GEN --vars-file="$vol_vars" \
+$VOL_ADDR_GEN \
+  --vars-file="$vol_vars" \
+  --all-vars-file="$all_vars" \
+  --all-var-addrs-output="$ccut2_exe_all_addrs" \
   "$ccut2_exe" \
   > "$ccut2_exe_vol_addrs" 2>&1
 if [ $? -ne 0 ]; then
@@ -421,6 +435,7 @@ $RUNSAFELY $TIMEOUT 1 /dev/null "$ccut2_exe_out" \
   -injection child \
   -t "$PIN_HOME/source/tools/ManualExamples/obj-intel64/pinatrace.so" \
   -vol_input "$ccut2_exe_vol_addrs" \
+  -all_vars_input "$ccut2_exe_all_addrs" \
   -output_mode checksum \
   -- "$ccut2_exe" \
   > /dev/null 2>&1
