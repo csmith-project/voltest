@@ -1043,6 +1043,11 @@ sub check_prereqs() {
     die "cannot run generated test cases!\n";
   }
 
+  if ($PIN_OUTPUT_MODE =~ m/ordered-/) {
+    if ($CSMITH_VOL_OPTS !~ m/strict-volatile-rule/) {
+      $CSMITH_VOL_OPTS .= "--strict-volatile-rule ";
+    }
+  }
   print_msg("chdir $cwd\n");
   chdir $cwd or die;
   print_msg("all prereqs passed!\n");
