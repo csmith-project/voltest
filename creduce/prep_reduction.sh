@@ -23,7 +23,7 @@
 CCUT1="gcc-4.4 -O0"
 # CCUT2="gcc-4.4 -O2"
 
-CPPFLAGS="-DINLINE= -DCSMITH_MINIMAL -DWRAP_VOLATILES=0 -DNOT_PRINT_CHECKSUM -I/local/randtest/src/csmith/runtime"
+CPPFLAGS="-DINLINE= -DCSMITH_MINIMAL -DWRAP_VOLATILES=0 -DNOT_PRINT_CHECKSUM -I/disk2/randtest/src/csmith/runtime"
 
 ###############################################################################
 

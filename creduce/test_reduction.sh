@@ -23,7 +23,7 @@
 CCUT1="gcc-4.4 -O0"
 CCUT2="gcc-4.4 -O2"
 
-CPPFLAGS="-DINLINE= -DCSMITH_MINIMAL -DWRAP_VOLATILES=0 -DNOT_PRINT_CHECKSUM -I/local/randtest/src/csmith/runtime"
+CPPFLAGS="-DINLINE= -DCSMITH_MINIMAL -DWRAP_VOLATILES=0 -DNOT_PRINT_CHECKSUM -I/disk2/randtest/src/csmith/runtime"
 
 # PIN_HOME: inherit this from the environment.
 
@@ -35,7 +35,7 @@ TIMEOUT_FRAMAC=125
 
 ## Environment configuration.
 
-CLANG=/local/randtest/src/llvm-install/bin/clang
+CLANG=/disk2/randtest/src/llvm-install/bin/clang
 CMP=cmp
 FRAMAC=/usr/bin/frama-c
 GCC=gcc
@@ -44,8 +44,8 @@ RM=rm
 
 RUNSAFELY=RunSafely
 
-VOL_CHECKER=/local/randtest/src/volatile_checker/volatile_checker
-VOL_ADDR_GEN=/local/randtest/src/volatile_pintrace/gen_volatile_addr.pl
+VOL_CHECKER=/disk2/randtest/src/volatile_checker/volatile_checker
+VOL_ADDR_GEN=/disk2/randtest/src/volatile_pintrace/gen_volatile_addr.pl
 
 ###############################################################################
 
