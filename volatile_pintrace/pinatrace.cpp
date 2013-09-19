@@ -787,11 +787,11 @@ static int SetOutputMode(const string &mode)
     else if (!mode.compare("verbose")) {
         output_mode = M_VERBOSE;
     }
-    else if (!mode.compare("ordered_checksum")) {
+    else if (!mode.compare("ordered-checksum")) {
         output_mode = M_ORDERED_CHECKSUM;
         Crc32Gentab(ordered_crc32_tab);
     }
-    else if (!mode.compare("ordered_verbose")) {
+    else if (!mode.compare("ordered-verbose")) {
         output_mode = M_ORDERED_VERBOSE;
     }
     else {
