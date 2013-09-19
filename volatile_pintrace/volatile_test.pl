@@ -448,6 +448,9 @@ sub parse_output($) {
   elsif ($mode eq "verbose") {
     ($checksum, $vol_str, $pintool_seed) = parse_verbose_output(*INF);
   }
+  elsif ($mode eq "ordered-verbose") {
+    ($checksum, $vol_str, $pintool_seed) = parse_verbose_output(*INF);
+  }
   else {
     die "Cannot happen: invalid PIN_OUTPUT_MODE[$PIN_OUTPUT_MODE]!";
   }
