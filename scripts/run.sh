@@ -23,6 +23,7 @@ set -u
 
 ###############################################################################
 
+# "launchn.pl" lives in $VOLATILE_PINTRACE_HOME
 cd "$WORK_RUN_HOME"
 launchn.pl
 
