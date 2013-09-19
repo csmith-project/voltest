@@ -1088,10 +1088,10 @@ sub main() {
         $PIN_RANDOM_READ = "-random_read";
       }
       elsif ($1 eq "no-vol-struct-union-fields") {
-        $CSMITH_VOL_OPTS .= "$1 ";
+        $CSMITH_VOL_OPTS .= "--$1 ";
       }
       elsif ($1 eq "strict-volatile-rule") {
-        $CSMITH_VOL_OPTS .= "$1 ";
+        $CSMITH_VOL_OPTS .= "--$1 ";
       }
       elsif ($1 eq "use-pin-checksums") {
         $USE_PIN_CHECKSUMS = 1;
