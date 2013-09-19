@@ -364,20 +364,21 @@ sub parse_summary_output(*) {
   return ($checksum, $vol_str, $pintool_seed);
 }
 
-sub parse_checksum_output(*) {
+sub parse_checksum_output(*$) {
   local *HANDLE = $_[0];
+  my $vol_checksum_str = $_[1];
 
   my $checksum = undef;
   my $vol_str = undef;
   my $pintool_seed = undef;
   while (my $line = <HANDLE>) {
     chomp $line;
-    if ($line =~ m/vol_access_checksum[\s\t]*=[\s\t]*([0-9a-fA-F]+)/) {
+    if ($line =~ m/$vol_checksum_str[\s\t]*=[\s\t]*([0-9a-fA-F]+)/) {
       if (defined($vol_str)) {
         print STDERR "ERROR: duplicated vol_access_checksum!\n";
         return (undef, undef, undef); 
       }
-      $vol_str = "vol_access_checksum = $1\n";
+      $vol_str = "$vol_checksum_str = $1\n";
     }
     elsif ($line =~ m/pintool_seed[\s\t]*=[\s\t]*([0-9a-fA-F]+)/) {
       if (defined($pintool_seed)) {
@@ -432,14 +433,19 @@ sub parse_output($) {
   my $checksum; 
   my $vol_str;
   my $pintool_seed;
+  my $mode = $PIN_OUTPUT_MODE;
+  $mode =~ s/-output_mode[\s\t]+//g;
   open INF, "<$out" or die;
-  if ($PIN_OUTPUT_MODE =~ m/summary/) {
+  if ($mode eq "summary") {
     ($checksum, $vol_str, $pintool_seed) = parse_summary_output(*INF);
   }
-  elsif ($PIN_OUTPUT_MODE =~ m/checksum/) {
-    ($checksum, $vol_str, $pintool_seed) = parse_checksum_output(*INF);
+  elsif ($mode eq "checksum") {
+    ($checksum, $vol_str, $pintool_seed) = parse_checksum_output(*INF, "vol_access_checksum");
   }
-  elsif ($PIN_OUTPUT_MODE =~ m/verbose/) {
+  elsif ($mode eq "ordered-checksum") {
+    ($checksum, $vol_str, $pintool_seed) = parse_checksum_output(*INF, "ordered_access_checksum");
+  }
+  elsif ($mode eq "verbose") {
     ($checksum, $vol_str, $pintool_seed) = parse_verbose_output(*INF);
   }
   else {
@@ -901,12 +907,12 @@ sub go_test() {
 ################################################################################
 
 my $help_msg = '
-Usage: volatile_test.pl --work-dir=[dir] --pin-output-mode=[checksum|verbose|summary]
+Usage: volatile_test.pl --work-dir=[dir] --pin-output-mode=[checksum|verbose|summary|ordered-checksum|ordered-verbose]
   Options:
   --work-dir=[dir]: specify the work-dir (default: work0)
   --use-pin-checksums: random programs will not print checksums, 
                        instead, checksums will be computed at runtime by the pintool
-  --pin-output-mode=[checksum|verbose|summary]: specify the output mode of the pintool (default: checksum)
+  --pin-output-mode=[checksum|verbose|summary|ordered-checksum|ordered-verbose]: specify the output mode of the pintool (default: checksum)
   --enable-pin-random-read: enable pintool to inject random values to volatile reads
   --iteration=[num]: specify how many testing runs (default: 100000000)
   --disable-swarm: disable swarm options
@@ -1049,7 +1055,8 @@ sub main() {
   while(defined ($opt = shift @ARGV)) {
     if ($opt =~ m/^--(.+)=(.+)$/) {
       if ($1 eq "pin-output-mode") {
-        die_on_invalid_opt($opt) if (($2 ne "checksum") && ($2 ne "summary") && ($2 ne "verbose"));
+        die_on_invalid_opt($opt) if 
+          (($2 ne "checksum") && ($2 ne "summary") && ($2 ne "verbose") && ($2 ne "ordered-checksum") && ($2 ne "ordered-verbose"));
         $PIN_OUTPUT_MODE = "-output_mode $2";
       }
       elsif ($1 eq "pin-seed") {
