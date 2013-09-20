@@ -45,9 +45,9 @@ my @clang_opts = (
 
 my @gcc_opts = (
     "-O0",
-    "-O1", 
-    "-O2", 
-    "-Os", 
+    #"-O1", 
+    #"-O2", 
+    #"-Os", 
     "-O3",
     );
 
@@ -94,7 +94,7 @@ my @clang = ("ia32",
              \@clang_opts);
 
 my @compilers_to_test = (
-    \@clang,
+    #\@clang,
     \@gcccurrent,
 );
 
@@ -861,6 +861,33 @@ sub test_one_program($) {
   return 0;
 }
 
+sub test_one_file($) {
+  my ($test_file) = @_;
+
+  my @a = split('/', $test_file);
+  my $fn = $a[-1];
+  die "bad sub_dir" unless (defined $fn);
+  $fn =~ s/\.c$//;
+  my $dir = "$WORKING_DIR/$fn";
+  if (-d $dir) {
+    system ("rm -rf $dir/*");
+  }
+  else {
+    system "mkdir $dir";
+  }
+  chdir $dir or die;
+  abort_if_fail("cp $test_file $fn.c");
+  my $res = test_one_program($fn);
+  if ($res) {
+    print "Success!\n";
+  }
+  else {
+    print "Failed!\n";
+  }
+
+  chdir "../..";
+}
+
 my $GOOD = 0;
 sub do_one_test($) {
   my ($n) = @_;
@@ -900,7 +927,14 @@ out:
   }
 }
 
-sub go_test() {
+sub go_test($) {
+  my ($test_file) = @_;
+  if (defined($test_file)) {
+    test_one_file($test_file);
+    print "\n";
+    return;
+  }
+
   for (my $i = 0; $i < $ITERATION; $i++) {
     do_one_test($i);
     print "\n";
@@ -923,6 +957,7 @@ Usage: volatile_test.pl --work-dir=[dir] --pin-output-mode=[checksum|verbose|sum
   --no-vol-struct-union-fields: disable struct/union fields
   --strict-volatile-rule: enable Csmith to generate programs with respect to one-vol-access-between-two-seq-points rule
   --use-sequential-seeds: use numbers [0, n-1] as the seeds to Csmith, where n is specified by --iteration=n
+  --cfile=<file>: test the specified file
   --help: this message
 ';
 
@@ -931,7 +966,9 @@ sub die_on_invalid_opt($) {
   die("$help_msg\n");
 }
 
-sub check_prereqs() {
+sub check_prereqs($) {
+  my ($test_file) = @_;
+
   print_msg("------ Start Checking Prereqs ------\n");
   if (!(-d $WORKING_DIR)) {
     print_msg("creating working dir[$WORKING_DIR]...");
@@ -988,6 +1025,17 @@ sub check_prereqs() {
     }
   }
   print_msg("succedded\n");
+  if ($USE_PIN_CHECKSUMS) {
+    $COMPILER_COMMON_OPTS .= " -DNOT_PRINT_CHECKSUM";
+  }
+
+  if (defined($test_file)) {
+    die "$test_file doesn't exist!" unless (-f $test_file);
+    print_msg("chdir $cwd\n");
+    chdir $cwd or die;
+    print_msg("all prereqs passed!\n");
+    return;
+  }
 
   print_msg("testing Csmith...\n");
   my $cmd = "$CSMITH_BIN --help > /dev/null 2>&1";
@@ -1017,7 +1065,6 @@ sub check_prereqs() {
     $extra_checker_opt = "--all-vars-output=$checker_all_addrs_out";
     $extra_gen_addr_opt = "--all-vars-file=$checker_all_addrs_out --all-var-addrs-output=$all_addrs_out";
     $pin_extra_opt = "-all_vars_input $all_addrs_out"; 
-    $COMPILER_COMMON_OPTS .= " -DNOT_PRINT_CHECKSUM";
   }
 
   while ($tries > 0) {
@@ -1059,6 +1106,7 @@ sub check_prereqs() {
 sub main() {
   my $opt;
   my @unused = ();
+  my $test_file = undef;
 
   while(defined ($opt = shift @ARGV)) {
     if ($opt =~ m/^--(.+)=(.+)$/) {
@@ -1075,6 +1123,10 @@ sub main() {
       }
       elsif ($1 eq "iteration") {
         $ITERATION = $2;
+      }
+      elsif ($1 eq "cfile") {
+        my $cwd = cwd();
+        $test_file = "$cwd/$2";
       }
       else {
         die_on_invalid_opt($opt);
@@ -1119,8 +1171,8 @@ sub main() {
   }
 
   die_on_invalid_opt($unused[0]) if (@unused != 0);
-  check_prereqs();
-  go_test();
+  check_prereqs($test_file);
+  go_test($test_file);
 }
 
 main();
