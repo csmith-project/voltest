@@ -45,9 +45,9 @@ my @clang_opts = (
 
 my @gcc_opts = (
     "-O0",
-    #"-O1", 
-    #"-O2", 
-    #"-Os", 
+    "-O1", 
+    "-O2", 
+    "-Os", 
     "-O3",
     );
 
@@ -94,7 +94,7 @@ my @clang = ("ia32",
              \@clang_opts);
 
 my @compilers_to_test = (
-    #\@clang,
+    \@clang,
     \@gcccurrent,
 );
 
@@ -957,7 +957,7 @@ Usage: volatile_test.pl --work-dir=[dir] --pin-output-mode=[checksum|verbose|sum
   --no-vol-struct-union-fields: disable struct/union fields
   --strict-volatile-rule: enable Csmith to generate programs with respect to one-vol-access-between-two-seq-points rule
   --use-sequential-seeds: use numbers [0, n-1] as the seeds to Csmith, where n is specified by --iteration=n
-  --cfile=<file>: test the specified file
+  --cfile=<file>: test the specified file (the file is supposed to be a non-preprocessed c source code)
   --help: this message
 ';
 
