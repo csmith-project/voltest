@@ -405,21 +405,21 @@ ccut2_exe_com_addrs=ccut2-exe-com-addrs-out.txt
 
 # Fancy shell scripting!  Use of obscure utilities!
 
-sort "$ccut1_exe_all_addrs" > "$ccut1_exe_all_addrs_sorted" 2>&1
+sort -t \; -k 1,1 "$ccut1_exe_all_addrs" > "$ccut1_exe_all_addrs_sorted" 2>&1
 if [ $? -ne 0 ]; then
   $QUIET_ECHO "$0: $CCUT1: unable to sort list of all objects"
   $NEAT_RM_OUTS
   exit 1
 fi
 
-sort "$ccut2_exe_all_addrs" > "$ccut2_exe_all_addrs_sorted" 2>&1
+sort -t \; -k 1,1 "$ccut2_exe_all_addrs" > "$ccut2_exe_all_addrs_sorted" 2>&1
 if [ $? -ne 0 ]; then
   $QUIET_ECHO "$0: $CCUT2: unable to sort list of all objects"
   $NEAT_RM_OUTS
   exit 1
 fi
 
-join -t \; -o 1.1,1.2,1.3,1.4 \
+join -t \; -o 1.1,1.2,1.3,1.4,1.5 \
   "$ccut1_exe_all_addrs_sorted" \
   "$ccut2_exe_all_addrs_sorted" \
   > "$ccut1_exe_com_addrs" 2>&1
@@ -429,7 +429,7 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-join -t \; -o 2.1,2.2,2.3,2.4 \
+join -t \; -o 2.1,2.2,2.3,2.4,2.5 \
   "$ccut1_exe_all_addrs_sorted" \
   "$ccut2_exe_all_addrs_sorted" \
   > "$ccut2_exe_com_addrs" 2>&1
