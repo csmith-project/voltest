@@ -17,6 +17,13 @@
 
 ###############################################################################
 
+if test -z "$VOLTEST_HOME"; then
+  echo $0: '$VOLTEST_HOME' is not set
+  exit 1
+fi
+
+###############################################################################
+
 ## Information about the test setup: the compilers under test and the
 ## environment for compiling and validating test programs.
 
@@ -41,6 +48,8 @@ FRAMAC=/usr/bin/frama-c
 GCC=gcc
 GREP=grep
 RM=rm
+
+FIND_COMMON_VARS="$VOLTEST_HOME"/creduce/find-common-vars.pl
 
 RUNSAFELY=RunSafely
 
@@ -394,34 +403,13 @@ fi
 ## Pin can compute the value checksum only over the state that is visible
 ## in both programs.
 
-ccut1_exe_all_addrs_sorted=ccut1-exe-all-addrs-sorted-out.txt
-ccut2_exe_all_addrs_sorted=ccut2-exe-all-addrs-sorted-out.txt
-
 # The addresses of "common" objects in each compiled program.  A "common"
 # object is one that appears in both of the compiled programs, although it
 # might have different locations across the two programs.
 ccut1_exe_com_addrs=ccut1-exe-com-addrs-out.txt
 ccut2_exe_com_addrs=ccut2-exe-com-addrs-out.txt
 
-# Fancy shell scripting!  Use of obscure utilities!
-
-sort "$ccut1_exe_all_addrs" > "$ccut1_exe_all_addrs_sorted" 2>&1
-if [ $? -ne 0 ]; then
-  $QUIET_ECHO "$0: $CCUT1: unable to sort list of all objects"
-  $NEAT_RM_OUTS
-  exit 1
-fi
-
-sort "$ccut2_exe_all_addrs" > "$ccut2_exe_all_addrs_sorted" 2>&1
-if [ $? -ne 0 ]; then
-  $QUIET_ECHO "$0: $CCUT2: unable to sort list of all objects"
-  $NEAT_RM_OUTS
-  exit 1
-fi
-
-join -t \; -o 1.1,1.2,1.3,1.4 \
-  "$ccut1_exe_all_addrs_sorted" \
-  "$ccut2_exe_all_addrs_sorted" \
+$FIND_COMMON_VARS "$ccut1_exe_all_addrs" "$ccut2_exe_all_addrs" \
   > "$ccut1_exe_com_addrs" 2>&1
 if [ $? -ne 0 ]; then
   $QUIET_ECHO "$0: $CCUT1: common-object extractor failed"
@@ -429,9 +417,7 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-join -t \; -o 2.1,2.2,2.3,2.4 \
-  "$ccut1_exe_all_addrs_sorted" \
-  "$ccut2_exe_all_addrs_sorted" \
+$FIND_COMMON_VARS "$ccut2_exe_all_addrs" "$ccut1_exe_all_addrs" \
   > "$ccut2_exe_com_addrs" 2>&1
 if [ $? -ne 0 ]; then
   $QUIET_ECHO "$0: $CCUT2: common-object extractor failed"
