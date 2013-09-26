@@ -17,13 +17,6 @@
 
 ###############################################################################
 
-if test -z "$VOLTEST_HOME"; then
-  echo $0: '$VOLTEST_HOME' is not set
-  exit 1
-fi
-
-###############################################################################
-
 ## Information about the test setup: the compilers under test and the
 ## environment for compiling and validating test programs.
 
@@ -33,6 +26,7 @@ CCUT2="gcc-4.4 -O2"
 CPPFLAGS="-DINLINE= -DCSMITH_MINIMAL -DWRAP_VOLATILES=0 -DNOT_PRINT_CHECKSUM -I/disk2/randtest/src/csmith/runtime"
 
 # PIN_HOME: inherit this from the environment.
+# VOLTEST_HOME: inherit this from the environment.
 
 TIMEOUT=5
 
@@ -48,8 +42,6 @@ FRAMAC=/usr/bin/frama-c
 GCC=gcc
 GREP=grep
 RM=rm
-
-FIND_COMMON_VARS="$VOLTEST_HOME"/creduce/find-common-vars.pl
 
 RUNSAFELY=RunSafely
 
@@ -105,6 +97,14 @@ if test -z "$PIN_HOME"; then
 fi
 if test ! -e "$PIN_HOME/pin.sh"; then
   echo "$0: \"\$PIN_HOME/pin.sh\" does not exist"
+  exit 1
+fi
+if test -z "$VOLTEST_HOME"; then
+  echo "$0: environment variable \$VOLTEST_HOME is not set"
+  exit 1
+fi
+if test ! -e "$VOLTEST_HOME/creduce/find-common-vars.pl"; then
+  echo "$0: \"\$VOLTEST_HOME/creduce/find-common-vars.pl\" does not exist"
   exit 1
 fi
 
@@ -409,7 +409,8 @@ fi
 ccut1_exe_com_addrs=ccut1-exe-com-addrs-out.txt
 ccut2_exe_com_addrs=ccut2-exe-com-addrs-out.txt
 
-$FIND_COMMON_VARS "$ccut1_exe_all_addrs" "$ccut2_exe_all_addrs" \
+"$VOLTEST_HOME/creduce/find-common-vars.pl" \
+  "$ccut1_exe_all_addrs" "$ccut2_exe_all_addrs" \
   > "$ccut1_exe_com_addrs" 2>&1
 if [ $? -ne 0 ]; then
   $QUIET_ECHO "$0: $CCUT1: common-object extractor failed"
@@ -417,7 +418,8 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-$FIND_COMMON_VARS "$ccut2_exe_all_addrs" "$ccut1_exe_all_addrs" \
+"$VOLTEST_HOME/creduce/find-common-vars.pl" \
+  "$ccut2_exe_all_addrs" "$ccut1_exe_all_addrs" \
   > "$ccut2_exe_com_addrs" 2>&1
 if [ $? -ne 0 ]; then
   $QUIET_ECHO "$0: $CCUT2: common-object extractor failed"
@@ -453,7 +455,7 @@ ccut1_exe_chk=ccut1-exe-out-chk.txt
 ccut1_exe_vchk=ccut1-exe-out-vchk.txt
 
 $GREP -e "^checksum" "$ccut1_exe_out" > "$ccut1_exe_chk"
-# $? is 0 is lines were matched; 1 if no lines matched; >1 if error.
+# $? is 0 if lines were matched; 1 if no lines matched; >1 if error.
 if [ $? -ne 0 ]; then
   $QUIET_ECHO "$0: $CCUT1: compiled program produced no checksum"
   $NEAT_RM_OUTS
@@ -461,7 +463,7 @@ if [ $? -ne 0 ]; then
 fi
 
 $GREP -e "^vol_access_checksum" "$ccut1_exe_out" > "$ccut1_exe_vchk"
-# $? is 0 is lines were matched; 1 if no lines matched; >1 if error.
+# $? is 0 if lines were matched; 1 if no lines matched; >1 if error.
 if [ $? -ne 0 ]; then
   $QUIET_ECHO "$0: $CCUT1: compiled program produced no volatile checksum"
   $NEAT_RM_OUTS
@@ -496,7 +498,7 @@ ccut2_exe_chk=ccut2-exe-out-chk.txt
 ccut2_exe_vchk=ccut2-exe-out-vchk.txt
 
 $GREP -e "^checksum" "$ccut2_exe_out" > "$ccut2_exe_chk"
-# $? is 0 is lines were matched; 1 if no lines matched; >1 if error.
+# $? is 0 if lines were matched; 1 if no lines matched; >1 if error.
 if [ $? -ne 0 ]; then
   $QUIET_ECHO "$0: $CCUT2: compiled program produced no checksum"
   $NEAT_RM_OUTS
@@ -504,7 +506,7 @@ if [ $? -ne 0 ]; then
 fi
 
 $GREP -e "^vol_access_checksum" "$ccut2_exe_out" > "$ccut2_exe_vchk"
-# $? is 0 is lines were matched; 1 if no lines matched; >1 if error.
+# $? is 0 if lines were matched; 1 if no lines matched; >1 if error.
 if [ $? -ne 0 ]; then
   $QUIET_ECHO "$0: $CCUT2: compiled program produced no volatile checksum"
   $NEAT_RM_OUTS
