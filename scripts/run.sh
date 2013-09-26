@@ -25,7 +25,10 @@ set -u
 
 # "launchn.pl" lives in $VOLATILE_PINTRACE_HOME
 cd "$WORK_RUN_HOME"
-launchn.pl -- --strict-volatile-rule --no-vol-struct-union-fields
+launchn.pl -- \
+  --strict-volatile-rule \
+  --no-vol-struct-union-fields \
+  --use-pin-checksums
 
 # To stop the madness
 #
