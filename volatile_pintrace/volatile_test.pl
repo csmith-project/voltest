@@ -24,6 +24,7 @@ my $WORKING_DIR = "work0";
 my $ITERATION = 500;
 my $USE_SWARM = 1;
 my $VERBOSE = 1;
+my $SKIP_TIMEOUT = 1;
 my $KEEP_TEMPS = 0;
 my $USE_PIN_CHECKSUMS = 0;
 my $USE_SEQUENTIAL_SEEDS = 0;
@@ -570,7 +571,14 @@ sub test_one_compiler($$$) {
       $PIN_SEED = "-seed $pintool_seeds{$opt}";
     }
     $first = 0;
-    next if ($res == $TIMEOUT_RES);
+    if ($res == $TIMEOUT_RES) {
+      if ($SKIP_TIMEOUT) {
+        return (1, undef, undef, undef);
+      }
+      else {
+        next;
+      }
+    }
     return (1, undef, undef, undef) if ($res);
     $success++;
   }
@@ -764,7 +772,14 @@ sub run_one_compiler_exes($$) {
       $PIN_SEED = "-seed $pintool_seeds{$opt}";
     }
     $first = 0;
-    next if ($res == $TIMEOUT_RES);
+    if ($res == $TIMEOUT_RES) {
+      if ($SKIP_TIMEOUT) {
+        return (1, undef, undef, undef);
+      }
+      else {
+        next;
+      }
+    }
     return (1, undef, undef, undef) if ($res);
     $success++;
   }
@@ -957,6 +972,7 @@ Usage: volatile_test.pl --work-dir=[dir] --pin-output-mode=[checksum|verbose|sum
   --no-vol-struct-union-fields: disable struct/union fields
   --strict-volatile-rule: enable Csmith to generate programs with respect to one-vol-access-between-two-seq-points rule
   --use-sequential-seeds: use numbers [0, n-1] as the seeds to Csmith, where n is specified by --iteration=n
+  --no-skip-timeout: run all generated executables with predefined TIMEOUT (passing this option can make test very slow)
   --cfile=<file>: test the specified file (the file is supposed to be a non-preprocessed c source code)
   --help: this message
 ';
@@ -1156,6 +1172,9 @@ sub main() {
       }
       elsif ($1 eq "use-sequential-seeds") {
         $USE_SEQUENTIAL_SEEDS = 1;
+      }
+      elsif ($1 eq "no-skip-timeout") {
+        $SKIP_TIMEOUT = 0;
       }
       elsif ($1 eq "help") {
         print $help_msg;
