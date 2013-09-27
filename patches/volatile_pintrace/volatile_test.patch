@@ -1,0 +1,23 @@
+Index: volatile_test.pl
+===================================================================
+--- volatile_test.pl	(revision 3940)
++++ volatile_test.pl	(working copy)
+@@ -87,9 +87,16 @@
+              "clang",
+              \@clang_opts);
+ 
++my @ubuntu_gcc44 = (
++    "ia32",
++    "gcc",
++    "gcc-4.4",
++    \@gcc_opts);
++
+ my @compilers_to_test = (
+-    \@clang,
+-    \@gcccurrent,
++    \@ubuntu_gcc44,
++    # \@clang,
++    # \@gcccurrent,
+ );
+ 
+ #########################################################

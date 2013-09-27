@@ -1,0 +1,3 @@
+g.f2; 10; 2; non-pointer; bitfield
+g.f3; 12; 13; non-pointer; bitfield
+Succeeded

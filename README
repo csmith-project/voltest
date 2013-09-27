@@ -1,0 +1,32 @@
+-*- mode: Text -*-
+
+A framework for performing volatile-testing experiments.
+
+To use:
+
+  + Use `ns/ubuntu12-pc3000.ns' to create and swap-in an Emulab experiment.
+    Let's assume that you call it "exp", in project "randtest".
+
+  + Login to your experiment:
+
+	ssh imp.exp.randtest.emulab.net
+
+  + Declare where to find a clone of this repository:
+
+	export VOLTEST_HOME=/proj/randtest/voltest
+
+  + Set up your environment (if you wish; scripts set their own):
+
+	. $VOLTEST_HOME/scripts/env.sh
+
+  + Install and configure the volatile-testing test harness:
+
+	$VOLTEST_HOME/scripts/setup.sh
+
+  + Run the test harness:
+
+	$VOLTEST_HOME/scripts/run.sh
+
+To learn where things go, see `$VOLTEST_HOME/scripts/vars.sh'.
+
+## End of file.

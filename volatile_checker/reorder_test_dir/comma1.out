@@ -1,0 +1,5 @@
+Functions that have volatile accesses: 
+  foo : volatile access to g1 at line 4
+  bar : volatile access to g1 at line 9
+
+Succeeded

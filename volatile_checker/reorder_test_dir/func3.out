@@ -1,0 +1,9 @@
+Error: Offensive Expr is at line 16: f2(f1(), g2)
+  multiple volatile accesses:
+  f1()
+  g2
+
+Functions that have volatile accesses: 
+  f1 : volatile access to g1 at line 6
+  f3 : volatile access to g2 at line 16
+

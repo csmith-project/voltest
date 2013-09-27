@@ -1,0 +1,11 @@
+Functions that have volatile accesses: 
+  f1 : volatile access to g1.a1.a1 at line 15
+  f2 : volatile access to g2 at line 22
+  f3 : volatile access to *g4 at line 29
+  f4 : volatile access to **g5 at line 35
+  f5 : volatile access to g5 at line 40
+  f6 : volatile access to g6.a3 at line 55
+  f7 : volatile access to g6.a2 at line 60
+  f8 : volatile access to *g6.a1 at line 65
+
+Succeeded

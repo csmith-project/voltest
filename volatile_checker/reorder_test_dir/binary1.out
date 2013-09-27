@@ -1,0 +1,8 @@
+Error: Offensive Expr is at line 7: (g1 == 0) || (g2 == g3)
+  multiple volatile accesses:
+  g2
+  g3
+
+Functions that have volatile accesses: 
+  foo : volatile access to g1 at line 7
+

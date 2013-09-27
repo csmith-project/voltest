@@ -1,0 +1,32 @@
+diff --git a/utah/scripts/old_john_driver/evaluate_program.pl b/utah/scripts/old_john_driver/evaluate_program.pl
+index 259b0b6..5dc85d6 100755
+--- a/utah/scripts/old_john_driver/evaluate_program.pl
++++ b/utah/scripts/old_john_driver/evaluate_program.pl
+@@ -529,6 +529,12 @@ my @ccomp = (
+      "ccomp",
+       \@ccomp_opts);
+ 
++my @ubuntu_gcc44 = (
++    "ia32",
++    "gcc",
++    "gcc-4.4",
++    \@gcc_opts2);
++
+ my @llvms = (
+     \@llvmgcc20, 
+     \@llvmgcc21, 
+@@ -538,9 +544,11 @@ my @llvms = (
+     );
+ 
+ my @compilers_to_test = (
+-    
+-    \@clang,
+-    \@gcccurrent,
++
++    \@ubuntu_gcc44,
++
++    #\@clang,
++    #\@gcccurrent,
+     
+     #\@gcc320,
+     #\@gcc330,

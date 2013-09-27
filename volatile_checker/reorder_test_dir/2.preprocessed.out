@@ -1,0 +1,17 @@
+Error: Offensive Expr is at line 2702: (*p_8) = (safe_rshift_func_uint8_t_u_u((&l_1684[3][5] == (g_1695 = l_1686[4][3][3])), func_78((**l_1681), (p_9 = (func_45(l_1696, (*l_1681), (*l_1696), l_1696) < 4294967292UL)), (*l_1696), (*g_1011))))
+  multiple volatile accesses:
+  func_45(l_1696, (*l_1681), (*l_1696), l_1696)
+  g_1011
+
+Functions that have volatile accesses: 
+  func_6 : volatile access to g_1203 at line 2517
+  func_11 : volatile access to g_591 at line 3100
+  func_32 : volatile access to *g_74 at line 3343
+  func_37 : volatile access to g_97 at line 3541
+  func_45 : volatile access to *g_74 at line 3904
+  func_51 : volatile access to *g_74 at line 3924
+  func_61 : volatile access to g_86 at line 3990
+  func_78 : volatile access to g_86 at line 4010
+  func_106 : volatile access to g_86 at line 4065
+  main : volatile access to g_86 at line 4271
+

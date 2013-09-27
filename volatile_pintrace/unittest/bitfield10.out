@@ -1,0 +1,4 @@
+g1.f1; 0x402028; 1; non-pointer
+g1.f1; 0x402029; 1; non-pointer; c0
+g1.f5; 0x40202c; 1; non-pointer; 1
+g1.f5; 0x40202d; 1; non-pointer; fe

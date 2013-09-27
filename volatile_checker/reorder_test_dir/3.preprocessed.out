@@ -1,0 +1,17 @@
+Error: Offensive Expr is at line 2798: l_2086 = func_66(&l_1931, (l_2073 ^= ((((safe_add_func_uint32_t_u_u((p_7 > func_44((*l_2030))), ((*l_2079) , (**g_525)))) > (safe_sub_func_uint16_t_u_u((((func_19(l_2085, (l_2026 = &l_1956[4])) , (*l_2025)) || p_10) > 0x677657B0EC45A456LL), 6L))) >= p_8) & p_7)), g_1217)
+  multiple volatile accesses:
+  func_44((*l_2030))
+  *g_525
+
+Functions that have volatile accesses: 
+  func_1 : volatile access to g_1685 at line 2442
+  func_5 : volatile access to g_638 at line 2487
+  func_27 : volatile access to *g_1715 at line 2964
+  func_34 : volatile access to g_682 at line 3031
+  func_44 : volatile access to g_638 at line 3365
+  func_60 : volatile access to g_191 at line 3390
+  func_66 : volatile access to g_638 at line 3516
+  func_70 : volatile access to **g_103 at line 3596
+  func_73 : volatile access to g_101 at line 4062
+  main : volatile access to g_30 at line 4084
+

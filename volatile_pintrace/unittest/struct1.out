@@ -1,0 +1,10 @@
+g1.f1+; 0x402040; 4; non-pointer
+(g1.f3+0).f2; 0x402054; 4; non-pointer
+(g1.f3+0).f4; 0x40205c; 3; non-pointer
+(g1.f3+0).f4; 0x40205f; 1; non-pointer; f8
+(g1.f3+1).f2; 0x402064; 4; non-pointer
+(g1.f3+1).f4; 0x40206c; 3; non-pointer
+(g1.f3+1).f4; 0x40206f; 1; non-pointer; f8
+(g1.f3+2).f2; 0x402074; 4; non-pointer
+(g1.f3+2).f4; 0x40207c; 3; non-pointer
+(g1.f3+2).f4; 0x40207f; 1; non-pointer; f8

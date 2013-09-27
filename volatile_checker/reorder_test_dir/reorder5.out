@@ -1,0 +1,5 @@
+Functions that have volatile accesses: 
+  f1 : volatile access to g1.a1 at line 21
+  f2 : volatile access to g2.a1 at line 27
+
+Succeeded

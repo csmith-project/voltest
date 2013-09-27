@@ -1,0 +1,8 @@
+Functions that have volatile accesses: 
+  func_1 : volatile access to g_9 at line 2384
+  func_10 : volatile access to *g_1342 at line 2471
+  func_15 : volatile access to g_2115 at line 2615
+  func_26 : volatile access to *g_841 at line 2886
+  main : volatile access to g_9 at line 4039
+
+Succeeded

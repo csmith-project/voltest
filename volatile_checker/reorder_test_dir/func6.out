@@ -1,0 +1,6 @@
+Functions that have volatile accesses: 
+  f1 : volatile access to g1 at line 5
+  f2 : volatile access to g1 at line 10
+  f3 : volatile access to callee(s) has volatile accesses
+
+Succeeded
