@@ -1,0 +1,7 @@
+g1; 0; 8; non-pointer; non-bitfield
+g2; 0; 16; non-pointer; non-bitfield
+g3; 0; 32; non-pointer; non-bitfield
+g4; 0; 64; non-pointer; non-bitfield
+g5; 0; 64; non-pointer; non-bitfield
+p1; 0; 64; pointer; non-bitfield
+Succeeded
