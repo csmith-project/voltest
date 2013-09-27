@@ -59,16 +59,16 @@ static vector<string> ordered_byte_accesses;
 
 static uint64_t GenSeed(void)
 {
-  int64_t l;
-  asm volatile(   "rdtsc\n\t"
-                : "=A" (l)
-        );
-  return l;
+    int64_t l;
+    asm volatile(   "rdtsc\n\t"
+                  : "=A" (l)
+          );
+    return l;
 }
 
 static uint64_t GenRand(void)
 {
-  return lrand48();
+    return lrand48();
 }
 
 static void Crc32Gentab (uint32_t *tab)
@@ -120,15 +120,15 @@ static void ComputeChecksumOnString(const string &s, uint32_t *context, uint32_t
   unsigned int i;
   unsigned len = s.length();
   for (i = 0; i < len; i++) {
-    Crc32(s[i], context, tab);
+      Crc32(s[i], context, tab);
   }
 }
 
 static void ComputeByteAccessChecksum(const string &name, const string &m, unsigned int value)
 {
-  ComputeChecksumOnString(name, &ordered_crc32_context, ordered_crc32_tab);
-  ComputeChecksumOnString(m, &ordered_crc32_context, ordered_crc32_tab);
-  Crc32(value, &ordered_crc32_context, ordered_crc32_tab);
+    ComputeChecksumOnString(name, &ordered_crc32_context, ordered_crc32_tab);
+    ComputeChecksumOnString(m, &ordered_crc32_context, ordered_crc32_tab);
+    Crc32(value, &ordered_crc32_context, ordered_crc32_tab);
 }
 
 enum OUTPUT_MODE {
@@ -163,10 +163,6 @@ public:
         return ((addr == addr_) ||
                 ((addr > addr_) && (addr < (addr_ + sz_))) ||
                 ((addr < addr_) && ((addr + sz) > addr_)));
-/*
-        return (((addr >= addr_) && (addr < (addr_+sz_))) ||
-                ((addr_ > addr) && (addr_ < (addr+sz))));
-*/
     }
 
     void set_next(VolElem *next) { next_ = next; }
@@ -263,14 +259,12 @@ VolElem::inc_counts(vector<unsigned int> &counts, ADDRINT addr, size_t sz)
 void
 VolElem::inc_read_counts(ADDRINT addr, size_t sz)
 {
-    //cout << hex << "read: addr: 0x" << addr << ", sz: " << sz << ", addr_: 0x" << addr_ << ", sz_ : " << sz_ << endl;
     inc_counts(byte_read_counts_, addr, sz);
 }
 
 void
 VolElem::inc_write_counts(ADDRINT addr, size_t sz)
 {
-    //cout << hex << "write: addr: 0x" << addr << ", sz: " << sz << ", addr_: " << addr_ << ", sz_ : " << sz_ << endl;
     inc_counts(byte_write_counts_, addr, sz);
 }
 
@@ -297,7 +291,6 @@ VolElem::add_byte_values(ADDRINT addr, size_t sz, unsigned int mode)
         start_pos = 0;
     }
 
-    // cout << hex << "r: addr: 0x" << addr << ", size: " << sz << ", start_pos: " << start_pos << ", sz_: " << sz_ << endl;
     for(size_t i = start_pos; i < sz; i++) {
         if ((i - start_pos) >= sz_)
             break;
@@ -307,19 +300,19 @@ VolElem::add_byte_values(ADDRINT addr, size_t sz, unsigned int mode)
 
         PIN_SafeCopy(&value, (char*)(addr+i), 1);
         if ((sz_ == 1) && bits_mask_) {
-          value &= bits_mask_;
+            value &= bits_mask_;
         }
         ss << "name:" << name_ << ", ";
         ss << m << " addr: " << hex << (addr+i) << ", ";
         ss << "value: " << hex << value << endl;
         if (output_mode == M_VERBOSE) {
-          byte_values_.push_back(ss.str());
+            byte_values_.push_back(ss.str());
         }
         else if (output_mode == M_ORDERED_VERBOSE) {
-          ordered_byte_accesses.push_back(ss.str());
+            ordered_byte_accesses.push_back(ss.str());
         }
         else if (output_mode == M_ORDERED_CHECKSUM) {
-          ComputeByteAccessChecksum(name_, m, value);
+            ComputeByteAccessChecksum(name_, m, value);
         }
     }
 }
@@ -342,7 +335,6 @@ VolElem::dump_summary()
             continue;
 
         cout << name_ << ": ";
-        //cout << "0x" << hex << (addr_+i) << ": ";
         cout << i << ": ";
         cout << byte_read_counts_[i] << " reads, " << byte_write_counts_[i] << " writes" << endl;
     }
@@ -639,13 +631,10 @@ static void RecordMem(ADDRINT addr, ADDRINT sz, unsigned int mode)
     
     while (elem != NULL) {
         if ((elem = IsVolAddress(addr, sz, elem)) != NULL) {
-            //cout << "Yang: " << hex << " addr: 0x" << addr << ", size: " << sz << endl;
             if (mode == WRITE_MODE) {
-                //cout << hex << "w: addr: 0x" << addr << ", size: " << sz << endl;
                 elem->inc_write_counts(addr, sz);
             }
             else if (mode == READ_MODE) {
-                //cout << hex << "r: addr: 0x" << addr << ", size: " << sz << endl;
                 elem->inc_read_counts(addr, sz);
             }
             else {
@@ -761,17 +750,17 @@ VOID Image(IMG img, VOID * v)
 VOID Fini(INT32 code, VOID *v)
 {
     if (DumpCsmithChecksum()) {
-      FiniVolTable();
-      exit(-1);
+        FiniVolTable();
+        exit(-1);
     }
     if (output_mode == M_ORDERED_CHECKSUM) {
-      DumpOrderedChecksum();
+        DumpOrderedChecksum();
     }
     else if (output_mode == M_ORDERED_VERBOSE) {
-      DumpVerboseOrderedAccesses();
+        DumpVerboseOrderedAccesses();
     }
     else {
-      DumpVolTable();
+        DumpVolTable();
     }
     FiniVolTable();
 }
