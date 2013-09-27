@@ -50,6 +50,10 @@ public:
     return SrcFileName;
   }
 
+  void set32BitTarget() {
+    Force32BitTarget = true;
+  }
+
   bool handleCheckerCmdOpt(const std::string &Arg);
 
   void printCheckerOptions();
@@ -82,6 +86,8 @@ private:
   std::string SrcFileName;
 
   clang::CompilerInstance *ClangInstance;
+
+  bool Force32BitTarget;
 
   // Unimplemented
   CheckerManager(const CheckerManager &);

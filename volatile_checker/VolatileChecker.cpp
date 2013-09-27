@@ -83,6 +83,10 @@ static bool HandleOneNonValueArg(const std::string &ArgStr)
     CheckerMgr->printCheckers();
     exit(0);
   }
+  else if (!ArgStr.compare("m32")) {
+    CheckerMgr->set32BitTarget();
+    return true;
+  }
   else {
     return false;
   }

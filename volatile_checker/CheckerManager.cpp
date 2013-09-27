@@ -123,7 +123,15 @@ bool CheckerManager::initializeCompilerInstance(
 #endif
 
   TargetOptions &TargetOpts = ClangInstance->getTargetOpts();
-  TargetOpts.Triple = LLVM_DEFAULT_TARGET_TRIPLE;
+  llvm::Triple DefaultTriple(LLVM_DEFAULT_TARGET_TRIPLE);
+  if (Force32BitTarget && !DefaultTriple.isArch32Bit()) {
+    llvm::Triple Triple32 = DefaultTriple.get32BitArchVariant();
+    TargetOpts.Triple = Triple32.getTriple();
+  }
+  else {
+    TargetOpts.Triple = LLVM_DEFAULT_TARGET_TRIPLE;
+  }
+  
   TargetInfo *Target = 
     TargetInfo::CreateTargetInfo(ClangInstance->getDiagnostics(),
                                  &TargetOpts);
@@ -340,7 +348,9 @@ void CheckerManager::printCheckerNames()
 
 CheckerManager::CheckerManager()
   : CurrentCheckerImpl(NULL),
-    SrcFileName("")
+    SrcFileName(""),
+    ClangInstance(NULL),
+    Force32BitTarget(false)
 {
   // Nothing to do
 }
