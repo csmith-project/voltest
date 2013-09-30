@@ -819,7 +819,11 @@ int main(int argc, char *argv[])
         seed = KnobSeed.Value();
         if (!seed)
             seed = GenSeed();
+#ifdef TARGET_IA32
+        fprintf(stdout, "pintool_seed=%llu\n", seed);
+#else
         fprintf(stdout, "pintool_seed=%lu\n", seed);
+#endif
         srand48(seed);
     }
 
