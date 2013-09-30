@@ -83,31 +83,33 @@ PIN_URL="http://software.intel.com/sites/landingpage/pintool/downloads/$PIN_TGZ"
 
 ###############################################################################
 
-## VOLATILE_CHECKER
+## VOLTEST
 
-VOLATILE_CHECKER_DIR=volatile_checker
+VOLTEST_DIR=voltest
 
-# Where to download volatile_checker from, via SVN.
-VOLATILE_CHECKER_SVN=svn+ssh://shell.cs.utah.edu/uusoc/res/embed/users/regehr/embedded_code_repo/yang/volatile_checker
+# Where to download voltest from, via Git.
+VOLTEST_GIT=git@github.com:csmith-project/voltest.git
 
-VOLATILE_CHECKER_HOME="$WORK_SRC_HOME/$VOLATILE_CHECKER_DIR"
+VOLTEST_HOME="$WORK_SRC_HOME/$VOLTEST_DIR"
 
-# What volatile_checker revision to use?
-VOLATILE_CHECKER_REV=HEAD
+# What voltest branch, tag, or commit to use?
+VOLTEST_REV=master
 
 ###############################################################################
 
-## VOLATILE_PINTRACE
+## VOLATILE_CHECKER, now a part of voltest
+
+VOLATILE_CHECKER_DIR=volatile_checker
+
+VOLATILE_CHECKER_HOME="$VOLTEST_HOME/$VOLATILE_CHECKER_DIR"
+
+###############################################################################
+
+## VOLATILE_PINTRACE, now a part of voltest
 
 VOLATILE_PINTRACE_DIR=volatile_pintrace
 
-# Where to download volatile_pintrace from, via SVN.
-VOLATILE_PINTRACE_SVN=svn+ssh://shell.cs.utah.edu/uusoc/res/embed/users/regehr/embedded_code_repo/yang/volatile_pintrace
-
-VOLATILE_PINTRACE_HOME="$WORK_SRC_HOME/$VOLATILE_PINTRACE_DIR"
-
-# What volatile_pintrace revision to use?
-VOLATILE_PINTRACE_REV=HEAD
+VOLATILE_PINTRACE_HOME="$VOLTEST_HOME/$VOLATILE_PINTRACE_DIR"
 
 ###############################################################################
 

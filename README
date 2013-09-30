@@ -4,16 +4,26 @@ A framework for performing volatile-testing experiments.
 
 To use:
 
-  + Use `ns/ubuntu12-pc3000.ns' to create and swap-in an Emulab experiment.
-    Let's assume that you call it "exp", in project "randtest".
+  + Decide on the name of your Emulab experiment.  Let's assume that you call
+    decide to call it "exp" to run it in the "randtest" project.
+
+  + Create a "bootstrap" file for your experiment.  Copy `scripts/bootstrap.sh'
+    to Emulab: put it in the `startcmds' subdirectory of your project directory
+    and give it a name to match your experiment.  So, for our example:
+
+	scp -p scripts/bootstrap.sh \
+	  users.emulab.net:/proj/randtest/startcmds/exp.sh
+
+  + Use `ns/ubuntu12-pc3000.ns' or one of the other NS files to create and
+    swap-in an Emulab experiment.
 
   + Login to your experiment:
 
 	ssh imp.exp.randtest.emulab.net
 
-  + Declare where to find a clone of this repository:
+  + Declare where to find the node-local clone of this repository:
 
-	export VOLTEST_HOME=/proj/randtest/voltest
+	export VOLTEST_HOME=/disk2/randtest/src/voltest
 
   + Set up your environment (if you wish; scripts set their own):
 

@@ -42,18 +42,20 @@ fi
 
 ## SET UP WORK DIRECTORIES
 
-time=`date +%H:%M:%S`
-echo "*** [$time]" "Setting up work directories..."
-
-umask 002
-
-sudo mkdir "$WORK_HOME"
-sudo chown "$USER:$PROJECT" "$WORK_HOME"
-chmod ug+rwx "$WORK_HOME"
-
-mkdir "$WORK_SRC_HOME"
-
-mkdir "$WORK_RUN_HOME"
+## Now all done by `bootstrap.sh'.
+#
+# time=`date +%H:%M:%S`
+# echo "*** [$time]" "Setting up work directories..."
+#
+# umask 002
+#
+# sudo mkdir "$WORK_HOME"
+# sudo chown "$USER:$PROJECT" "$WORK_HOME"
+# chmod ug+rwx "$WORK_HOME"
+#
+# mkdir "$WORK_SRC_HOME"
+#
+# mkdir "$WORK_RUN_HOME"
 
 ###############################################################################
 
@@ -133,14 +135,6 @@ make > Make.errs 2>&1
 
 time=`date +%H:%M:%S`
 echo "*** [$time]" "Setting up volatile_pintrace..."
-
-# Get volatile_pintrace.
-#
-time=`date +%H:%M:%S`
-echo "*** [$time]" "  Acquiring volatile_pintrace sources (@ $VOLATILE_PINTRACE_REV)..."
-#
-svn co $quiet --revision "$VOLATILE_PINTRACE_REV" \
-  "$VOLATILE_PINTRACE_SVN" "$VOLATILE_PINTRACE_HOME"
 
 # Get Pin.  Assumes that PIN_HOME == "$WORK_SRC_DIR/$PIN_DIR".
 #
@@ -322,14 +316,6 @@ sudo apt-get $very_quiet -y install frama-c
 
 time=`date +%H:%M:%S`
 echo "*** [$time]" "Setting up volatile_checker..."
-
-# Get volatile_checker.
-#
-time=`date +%H:%M:%S`
-echo "*** [$time]" "  Acquiring volatile_checker sources (@ $VOLATILE_CHECKER_REV)..."
-#
-svn co $quiet  --revision "$VOLATILE_CHECKER_REV" \
-  "$VOLATILE_CHECKER_SVN" "$VOLATILE_CHECKER_HOME"
 
 # Compile as directed by `volatile_checker/README.txt'.
 #

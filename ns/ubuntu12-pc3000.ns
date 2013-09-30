@@ -6,6 +6,8 @@
 set ns [new Simulator]
 source tb_compat.tcl
 
+set opt(MNT) "/disk2"
+
 set imp [$ns node]
 tb-set-hardware $imp pc3000
 tb-set-node-os $imp UBUNTU12-64-STD
@@ -13,8 +15,13 @@ tb-set-node-os $imp UBUNTU12-64-STD
 set fs [$ns blockstore]
 $fs set-class local
 $fs set-placement NONSYSVOL
-$fs set-mount-point /disk2
+$fs set-mount-point $opt(MNT)
 $fs set-node $imp
+
+tb-set-node-startcmd $imp \
+    {scp -p users.emulab.net:/proj/$PID/startcmds/$EID.sh /tmp && \
+     chmod +x /tmp/$EID.sh && \
+     /tmp/$EID.sh $MNT/$PID}
 
 $ns rtproto Static
 $ns run
