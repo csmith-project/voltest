@@ -26,6 +26,7 @@ my $USE_SWARM = 1;
 my $VERBOSE = 1;
 my $TARGET_M32 = 0;
 my $TARGET_M32_OPT = "";
+my $TEST_COMPCERT = 0;
 my $SKIP_TIMEOUT = 1;
 my $KEEP_TEMPS = 0;
 my $USE_PIN_CHECKSUMS = 0;
@@ -36,7 +37,7 @@ my $RunSafely;
 
 ##########################################################
 # compilers under test
-my $COMPILER_COMMON_OPTS = "-w -DINLINE= -DCSMITH_MINIMAL -DWRAP_VOLATILES=0";
+my $COMPILER_COMMON_OPTS = "-DINLINE= -DCSMITH_MINIMAL -DWRAP_VOLATILES=0";
 
 my @clang_opts = (
     "-O0 ",
@@ -53,6 +54,10 @@ my @gcc_opts = (
     "-Os", 
     "-O3",
     );
+
+my @ccomp_opts = (
+    "-fall",
+);
 
 my $Z = "/home/regehr/z/compilers";
 
@@ -96,9 +101,15 @@ my @clang = ("ia32",
              "clang",
              \@clang_opts);
 
+my @ccomp = ("ia32",
+             "ccomp",
+             "ccomp",
+             \@ccomp_opts);
+
 my @compilers_to_test = (
     \@clang,
     \@gcccurrent,
+    \@ccomp,
 );
 
 #########################################################
@@ -285,9 +296,17 @@ sub compile_cfile($$$$$) {
   my ($arch, $compiler_cmd, $compiler_opt, $cfile, $exe) = @_;
 
   my $compiler_out = "$exe.out";
-  my $target_opt = "";
-  $target_opt = "-m32" if ($TARGET_M32);
-  my $cmd = "$RunSafely $COMPILER_TIMEOUT 1 /dev/null $compiler_out $compiler_cmd $compiler_opt $target_opt $COMPILER_COMMON_OPTS -I$CSMITH_HOME/runtime $cfile -o $exe";
+  my $compiler_common_opts = $COMPILER_COMMON_OPTS;
+  if ($TARGET_M32) {
+    if ($compiler_cmd =~ m/ccomp/) {
+      $compiler_common_opts =~ s/-w//g;
+    }
+    else {
+      $compiler_common_opts .= " -m32";
+    }
+  }
+  
+  my $cmd = "$RunSafely $COMPILER_TIMEOUT 1 /dev/null $compiler_out $compiler_cmd $compiler_opt $compiler_common_opts -I$CSMITH_HOME/runtime $cfile -o $exe";
   print "[$arch]: $compiler_cmd $compiler_opt: $cmd\n";
   my $res = runit($cmd);
   if ($res || !(-f $exe)) {
@@ -1022,6 +1041,15 @@ sub check_prereqs($) {
   die "failed: is $RunSafely in the PATH env?" if ($res);
   print_msg("succeeded\n");
 
+  if ($TEST_COMPCERT) {
+    $TARGET_M32 = 1;
+    $CSMITH_VOL_OPTS .= "--ccomp ";
+    $USE_SWARM = 0;
+  }
+  else {
+    @compilers_to_test = grep { my (undef, undef, $comp_bin, undef) = @{$_}; $comp_bin !~ m/ccomp/ } @compilers_to_test;
+  }
+
   if ($TARGET_M32) {
     $PIN_BIN = "$PIN_HOME/pin.sh -injection child -t $PIN_HOME/source/tools/ManualExamples/obj-ia32/pinatrace.so";
     $TARGET_M32_OPT = "--m32";
@@ -1181,6 +1209,9 @@ sub main() {
       }
       elsif ($1 eq "disable-swarm") {
         $USE_SWARM = 0;
+      }
+      elsif ($1 eq "ccomp") {
+         $TEST_COMPCERT = 1;
       }
       elsif ($1 eq "use-sequential-seeds") {
         $USE_SEQUENTIAL_SEEDS = 1;
