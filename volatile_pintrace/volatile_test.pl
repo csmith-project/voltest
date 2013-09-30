@@ -24,6 +24,8 @@ my $WORKING_DIR = "work0";
 my $ITERATION = 500;
 my $USE_SWARM = 1;
 my $VERBOSE = 1;
+my $TARGET_M32 = 0;
+my $TARGET_M32_OPT = "";
 my $SKIP_TIMEOUT = 1;
 my $KEEP_TEMPS = 0;
 my $USE_PIN_CHECKSUMS = 0;
@@ -283,7 +285,9 @@ sub compile_cfile($$$$$) {
   my ($arch, $compiler_cmd, $compiler_opt, $cfile, $exe) = @_;
 
   my $compiler_out = "$exe.out";
-  my $cmd = "$RunSafely $COMPILER_TIMEOUT 1 /dev/null $compiler_out $compiler_cmd $compiler_opt $COMPILER_COMMON_OPTS -I$CSMITH_HOME/runtime $cfile -o $exe";
+  my $target_opt = "";
+  $target_opt = "-m32" if ($TARGET_M32);
+  my $cmd = "$RunSafely $COMPILER_TIMEOUT 1 /dev/null $compiler_out $compiler_cmd $compiler_opt $target_opt $COMPILER_COMMON_OPTS -I$CSMITH_HOME/runtime $cfile -o $exe";
   print "[$arch]: $compiler_cmd $compiler_opt: $cmd\n";
   my $res = runit($cmd);
   if ($res || !(-f $exe)) {
@@ -860,7 +864,7 @@ sub test_one_program($) {
     print STDERR "preprocessor FAILED!\n";
     return -1;
   }
-  $res = runit("$CHECKER --checker=volatile-address $extra_checker_opt $root.pre.i > $checker_vols_out 2>&1");
+  $res = runit("$CHECKER $TARGET_M32_OPT --checker=volatile-address $extra_checker_opt $root.pre.i > $checker_vols_out 2>&1");
   if ($res) {
     print STDERR "volatile_checker FAILURE\n";
     return -1;
@@ -1018,6 +1022,14 @@ sub check_prereqs($) {
   die "failed: is $RunSafely in the PATH env?" if ($res);
   print_msg("succeeded\n");
 
+  if ($TARGET_M32) {
+    $PIN_BIN = "$PIN_HOME/pin.sh -injection child -t $PIN_HOME/source/tools/ManualExamples/obj-ia32/pinatrace.so";
+    $TARGET_M32_OPT = "--m32";
+  }
+  else {
+    $PIN_BIN = "$PIN_HOME/pin.sh -injection child -t $PIN_HOME/source/tools/ManualExamples/obj-intel64/pinatrace.so";
+  }
+
   print_msg("checking volatile_checker...\n");
   $CHECKER = "volatile_checker";
   if (runit("$CHECKER --help > /dev/null 2>&1")) {
@@ -1089,7 +1101,7 @@ sub check_prereqs($) {
     $csmith_ok = 1;
     my $res = runit("gcc -E -I$CSMITH_HOME/runtime $cfile > $preprocessed_cfile 2>&1");
     next if (compile_cfile("ia32", "gcc", "-O0", $preprocessed_cfile, $exe));
-    next if (runit("$CHECKER --checker=volatile-address $extra_checker_opt $preprocessed_cfile > $checker_vols_out 2>&1"));
+    next if (runit("$CHECKER $TARGET_M32_OPT --checker=volatile-address $extra_checker_opt $preprocessed_cfile > $checker_vols_out 2>&1"));
     next if (runit("$GEN_VOLATILE_ADDR --vars-file=$checker_vols_out $extra_gen_addr_opt $exe > $vol_addrs_out 2>&1"));
     $test_case_ok = 1;
     my $raw_out = "$exe.raw-out";
@@ -1175,6 +1187,9 @@ sub main() {
       }
       elsif ($1 eq "no-skip-timeout") {
         $SKIP_TIMEOUT = 0;
+      }
+      elsif ($1 eq "m32") {
+        $TARGET_M32 = 1;
       }
       elsif ($1 eq "help") {
         print $help_msg;
