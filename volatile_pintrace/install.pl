@@ -50,6 +50,7 @@ sub setup_pintool() {
   abort_if_fail("cp -f $SCRIPT_HOME/pinatrace.cpp $pin_dir/");
   chdir_or_die($pin_dir);
   abort_if_fail("make > /dev/null 2>&1");
+  abort_if_fail("TARGET=ia32 make > /dev/null 2>&1");
   chdir_or_die("$cwd");
   abort_if_fail("cp -f $SCRIPT_HOME/pin.sh $PIN_HOME/");
   print "- Successfully built pin\n\n";
