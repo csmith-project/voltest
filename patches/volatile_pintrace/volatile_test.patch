@@ -1,10 +1,10 @@
-Index: volatile_test.pl
-===================================================================
---- volatile_test.pl	(revision 3940)
-+++ volatile_test.pl	(working copy)
-@@ -87,9 +87,16 @@
-              "clang",
-              \@clang_opts);
+diff --git a/volatile_pintrace/volatile_test.pl b/volatile_pintrace/volatile_test.pl
+index 34ba969..e8aed90 100755
+--- a/volatile_pintrace/volatile_test.pl
++++ b/volatile_pintrace/volatile_test.pl
+@@ -106,10 +106,17 @@ my @ccomp = ("ia32",
+              "ccomp",
+              \@ccomp_opts);
  
 +my @ubuntu_gcc44 = (
 +    "ia32",
@@ -15,9 +15,11 @@ Index: volatile_test.pl
  my @compilers_to_test = (
 -    \@clang,
 -    \@gcccurrent,
+-    \@ccomp,
 +    \@ubuntu_gcc44,
 +    # \@clang,
 +    # \@gcccurrent,
++    # \@ccomp,
  );
  
  #########################################################
