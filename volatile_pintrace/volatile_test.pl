@@ -998,6 +998,7 @@ Usage: volatile_test.pl --work-dir=[dir] --pin-output-mode=[checksum|verbose|sum
   --no-skip-timeout: run all generated executables with predefined TIMEOUT (passing this option can make test very slow)
   --cfile=<file>: test the specified file (the file is supposed to be a non-preprocessed c source code)
   --m32: enable testing 32-bit architecture
+  --ccomp: enable testing CompCert
   --help: this message
 ';
 
