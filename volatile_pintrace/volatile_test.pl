@@ -878,7 +878,11 @@ sub test_one_program($) {
     $extra_checker_opt = "--all-vars-output=$checker_all_addrs_out";
   }
 
-  my $res = runit("gcc -E -I$CSMITH_HOME/runtime $root.c > ${root}.pre.i 2>&1");
+  my $m32_opt = "";
+  if ($TARGET_M32) {
+    $m32_opt = "-m32";
+  }
+  my $res = runit("gcc -E $m32_opt -I$CSMITH_HOME/runtime $root.c > ${root}.pre.i 2>&1");
   if ($res) {
     print STDERR "preprocessor FAILED!\n";
     return -1;
