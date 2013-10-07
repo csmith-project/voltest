@@ -112,7 +112,7 @@ sub do_one_compiler($$) {
   }
   abort_if_fail("$GEN_VOLATILE_ADDR --vars-file=$CHECKER_ADDR_OUT ${input_root}_$comp_name > $VOL_ADDR_OUT_PREFIX.$comp_name.txt");
   abort_if_fail("$RUN_SAFELY 20 1 /dev/null out.$comp_name.txt $PIN_BIN -vol_input $VOL_ADDR_OUT_PREFIX.$comp_name.txt -output_mode $PIN_MODE -- ./${input_root}_$comp_name > /dev/null 2>&1");
-  push @$all_out_files, "out.$comp_name.txt";
+  $all_out_files->{$comp_name} = "out.$comp_name.txt";
 }
 
 sub get_checksums($) {
@@ -138,22 +138,35 @@ sub get_checksums($) {
 sub check_outputs($) {
   my ($all_out_files) = @_;
   my %all_vol_checksums = ();
-  exit 1 if (scalar(@$all_out_files) < 1);
-  my ($checksum, $vol_checksum) = get_checksums($all_out_files->[0]);
-  $all_vol_checksums{$vol_checksum} = 1;
-  for (my $i = 1; $i < @$all_out_files; $i++) {
-    my ($tmp_checksum, $tmp_vol_checksum) = get_checksums($all_out_files->[$i]);
+  my %compiler_to_vol_checksum = ();
+  my %all_checksums = ();
+  exit 1 if (scalar(keys %$all_out_files) < 1);
+  foreach my $comp_name (sort keys %$all_out_files) {
+    my ($tmp_checksum, $tmp_vol_checksum) = get_checksums($all_out_files->{$comp_name});
     if ($CHECK_CHECKSUM) {
-      exit 1 unless (defined($tmp_checksum) && defined($checksum));
-      exit 1 if ($checksum ne $tmp_checksum);
+      exit 1 unless (defined($tmp_checksum));
+      $all_checksums{$tmp_checksum} = 1;
     }
     $all_vol_checksums{$tmp_vol_checksum} = 1;
-    #exit 1 unless (defined($tmp_vol_checksum) && defined($vol_checksum));
-    #exit 1 if ($vol_checksum eq $tmp_vol_checksum);
+    $compiler_to_vol_checksum{$comp_name} = $tmp_vol_checksum;
   }
+  if ($CHECK_CHECKSUM) {
+    exit 1 if (scalar(keys %all_checksums) != 1);
+  }
+
+  # exit 1 if (scalar(keys %all_vol_checksums) == 1);
+
   # a stronger invariant: each compiler produces a different vol_checksum
   # (if we have more than 2 compilers)
-  exit 1 if (scalar(keys %COMPILERS) != scalar(keys %all_vol_checksums));
+  # exit 1 if (scalar(keys %COMPILERS) != scalar(keys %all_vol_checksums));
+
+  if (($compiler_to_vol_checksum{"gcc"} eq $compiler_to_vol_checksum{"clang"}) &&
+      ($compiler_to_vol_checksum{"gcc"} ne $compiler_to_vol_checksum{"ccomp"})) {
+    # good
+  }
+  else {
+    exit 1;
+  }
 }
 
 sub run_framac() {
@@ -210,11 +223,11 @@ sub go() {
   pre_check();
   abort_if_fail("$CHECKER $ARCH_CHECKER_OPT --checker=volatile-address $TEST_INPUT > $CHECKER_ADDR_OUT 2>&1");
   
-  my @all_out_files = ();
+  my %all_out_files = ();
   foreach my $comp_name (sort keys %COMPILERS) {
-    do_one_compiler($comp_name, \@all_out_files);
+    do_one_compiler($comp_name, \%all_out_files);
   }
-  check_outputs(\@all_out_files);
+  check_outputs(\%all_out_files);
   run_framac();
 }
 
