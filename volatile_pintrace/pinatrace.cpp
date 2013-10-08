@@ -240,6 +240,7 @@ VolElem::is_in_range(ADDRINT addr, size_t sz)
 void
 VolElem::inc_counts(vector<unsigned int> &counts, ADDRINT addr, size_t sz)
 {
+#if 0
     unsigned int start_pos;
     //if (!is_in_range(addr, sz))
     //    return;
@@ -250,9 +251,18 @@ VolElem::inc_counts(vector<unsigned int> &counts, ADDRINT addr, size_t sz)
         start_pos = 0;
 
     for (size_t i = 0; i < sz; i++) {
-        if ((i+start_pos) >= sz_)
+        if ((i + start_pos) >= sz_)
             break;
         counts[i+start_pos] += 1;
+    }
+#endif
+
+    for (size_t i = 0; i < sz; i++) {
+        if ((addr + i) >= addr_ + sz_)
+            break;
+        if ((addr + i) < addr_)
+            continue;
+        counts[addr+i-addr_] += 1;
     }
 }
 
@@ -293,6 +303,8 @@ VolElem::add_byte_values(ADDRINT addr, size_t sz, unsigned int mode)
 
     for(size_t i = start_pos; i < sz; i++) {
         if ((i - start_pos) >= sz_)
+            break;
+        if ((i + addr) >= (addr_ + sz_))
             break;
 
         ostringstream ss;
