@@ -86,7 +86,7 @@ sub pre_check() {
     'no semicolon at end',
     'type defaults to',
     'format',
-    'incompatible pointer',
+    #'incompatible pointer',
     'ordered comparison of pointer with integer',
     'declaration does not declare anything',
     'expects type',
@@ -95,7 +95,7 @@ sub pre_check() {
     'excess elements in struct initializer',
     'comparison between pointer and integer',
   );
-  exit(1) if has_warning($pre_out, \@clang_warnings);
+  exit(1) if has_warning($pre_out, \@gcc_warnings);
 }
 
 sub do_one_compiler($$) {
