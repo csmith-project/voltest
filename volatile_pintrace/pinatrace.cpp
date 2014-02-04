@@ -316,7 +316,10 @@ VolElem::add_byte_values(ADDRINT addr, size_t sz, unsigned int mode)
         }
         ss << "name:" << name_ << ", ";
         ss << m << " addr: " << hex << (addr+i) << ", ";
-        ss << "value: " << hex << value << endl;
+        ss << "value: " << hex << value;
+        if (is_pointer_)
+            ss << " (pointer value)";
+        ss << endl;
         if (output_mode == M_VERBOSE) {
             byte_values_.push_back(ss.str());
         }
@@ -324,7 +327,10 @@ VolElem::add_byte_values(ADDRINT addr, size_t sz, unsigned int mode)
             ordered_byte_accesses.push_back(ss.str());
         }
         else if (output_mode == M_ORDERED_CHECKSUM) {
-            ComputeByteAccessChecksum(name_, m, value);
+            if (is_pointer_)
+                ComputeByteAccessChecksum(name_, m, 0);
+             else
+                ComputeByteAccessChecksum(name_, m, value);
         }
     }
 }
