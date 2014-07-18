@@ -21,7 +21,7 @@ $fs set-node $imp
 tb-set-node-startcmd $imp \
     {scp -p users.emulab.net:/proj/$PID/startcmds/$EID.sh /tmp && \
      chmod +x /tmp/$EID.sh && \
-     /tmp/$EID.sh $MNT/$PID}
+     /tmp/$EID.sh $MNT/$PID >& /tmp/$EID.log}
 
 $ns rtproto Static
 $ns run
